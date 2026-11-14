@@ -84,6 +84,8 @@ def main():
     for old, new in patches:
         assert ported.count(old) == 1, old
         ported = ported.replace(old, new)
+    import frekks_patches
+    ported = frekks_patches.apply(ported)
     with open(sys.argv[2], "w", encoding="utf-8") as f:
         f.write(ported)
     open(os.path.join(ROOT, "frekks", "linoria_library.lua"), "w").write(module)
