@@ -52,6 +52,26 @@ def main():
     module = module_source()
     replacement = START + "\n    LPH_ATTRIBUTES(VM(NONE), ERROR_HANDLING(false));\n" + module.rstrip("\n") + "\nend\n\n"
     ported = original[:a] + replacement + original[b:]
+    # Menu Transparency: 0% = solid, 100% = fully see-through (new pref id so old saved
+    # opacity values are not read with the inverted meaning)
+    patches = [
+        ("'MenuKeybind', 'P3S1T3', 'FrekksMenuOpacity',", "'MenuKeybind', 'P3S1T3', 'FrekksMenuTransparency',"),
+        ("menu:AddSlider('FrekksMenuOpacity', {\n        Text = 'Menu Transparency', Default = readNumber('FrekksMenuOpacity', 100, 0, 100),",
+         "menu:AddSlider('FrekksMenuTransparency', {\n        Text = 'Menu Transparency', Default = readNumber('FrekksMenuTransparency', 0, 0, 100),"),
+        ("Callback = function(value) applyOpacity(value); persist() end,", "Callback = function(value) applyOpacity(100 - value); persist() end,"),
+        ("applyOpacity(options.FrekksMenuOpacity.Value)", "applyOpacity(100 - options.FrekksMenuTransparency.Value)"),
+        ("""                instance.BackgroundTransparency = 1 - (1 - base) * value / 100
+            end""", """                instance.BackgroundTransparency = 1 - (1 - base) * value / 100
+                if instance:IsA('ImageLabel') and (instance.Name == 'Backdrop' or instance.Name == 'Blossoms') then
+                    local imageBase = originalTransparency[instance.Name]
+                    if imageBase == nil then imageBase = instance.ImageTransparency; originalTransparency[instance.Name] = imageBase end
+                    instance.ImageTransparency = 1 - (1 - imageBase) * value / 100
+                end
+            end"""),
+    ]
+    for old, new in patches:
+        assert ported.count(old) == 1, old
+        ported = ported.replace(old, new)
     with open(sys.argv[2], "w", encoding="utf-8") as f:
         f.write(ported)
     open(os.path.join(ROOT, "frekks", "linoria_library.lua"), "w").write(module)

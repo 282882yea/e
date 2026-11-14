@@ -5194,7 +5194,7 @@ function Library:CreateWindow(info)
 		size = Vector2.new(math.max(size.X.Offset, 1024), math.max(size.Y.Offset, 620))
 	end
 	local radius = CORNERS_OK and (info.CornerRadius or 10) or 0
-	local layerAlpha = math.sqrt(math.clamp(info.Transparency or 0.12, 0, 0.6))
+	local layerAlpha = math.sqrt(math.clamp(info.Transparency or 0, 0, 0.6))
 	loadAssets(info.AssetFolder or "Frekks Hail v3")
 
 	local self = setmetatable({
