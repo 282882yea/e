@@ -23,15 +23,23 @@ def lua_points(points) -> str:
     return "{ " + ", ".join("{ %d, %d }" % (p[0], p[1]) for p in points) + " }"
 
 
-def embedded() -> str:
+def embedded(extra=None) -> str:
+    """extra: {name: png path} added to the embedded files (and to `sizes`)."""
     icons = json.load(open(os.path.join(ASSETS, "icons.json")))
     art = json.load(open(os.path.join(ASSETS, "art.json")))
     digest = hashlib.sha1()
     blobs = {}
-    for name in FILES:
-        raw = open(os.path.join(ASSETS, name + ".png"), "rb").read()
+    names = list(FILES) + list((extra or {}).keys())
+    paths = {name: os.path.join(ASSETS, name + ".png") for name in FILES}
+    paths.update(extra or {})
+    for name in names:
+        raw = open(paths[name], "rb").read()
         digest.update(raw)
         blobs[name] = base64.b64encode(raw).decode()
+    if extra:
+        from PIL import Image
+        for name, path in extra.items():
+            art["sizes"][name] = list(Image.open(path).size)
 
     out = ["{"]
     out.append(f'\tversion = "{digest.hexdigest()[:10]}",')
@@ -55,7 +63,7 @@ def embedded() -> str:
         out.append("\t\t%s = %s," % (name, lua_points(points)))
     out.append("\t},")
     out.append("\tfiles = {")
-    for name in FILES:
+    for name in names:
         out.append("\t\t%s = %s," % (name, lua_string_table(blobs[name])))
     out.append("\t},")
     out.append("}")

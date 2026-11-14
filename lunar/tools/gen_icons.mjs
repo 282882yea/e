@@ -30,6 +30,12 @@ const names = [
     'rotate-ccw', 'chevrons-up-down', 'minus', 'plus', 'activity', 'info', 'bell', 'save',
     'folder', 'trash-2', 'gauge', 'move', 'wind', 'layers', 'globe', 'lock',
     'mouse-pointer-click', 'scan', 'radar', 'flower-2', 'star', 'heart', 'power', 'chevron-right',
+    'swords', 'sword', 'layout-grid', 'venetian-mask', 'ghost', 'flame', 'volume-2', 'camera',
+    'package', 'bug', 'folder-cog', 'sun', 'cloud', 'cloud-rain', 'cloud-lightning', 'music',
+    'image', 'monitor', 'footprints', 'trophy', 'gift', 'user-cog', 'users', 'list',
+    'file-text', 'clipboard', 'copy', 'refresh-cw', 'code', 'skull', 'bomb', 'shirt',
+    'award', 'wrench', 'droplet', 'mountain', 'aperture', 'video', 'type', 'pipette',
+    'paintbrush', 'hand', 'wand-sparkles', 'map-pin', 'eye-off', 'scan-eye', 'crown', 'history',
 ]
 
 function inner(name) {
