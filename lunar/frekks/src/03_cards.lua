@@ -989,7 +989,7 @@ function Card:AddViewport(id, info)
 	})
 	corner(viewport, 12)
 	stroke(viewport, "Divider", 1, 0.2)
-	local camera = info.Camera or Instance.new("Camera")
+	local camera = info.Camera or makeInstance("Camera")
 	camera.Parent = viewport
 	viewport.CurrentCamera = camera
 	local object = info.Object

@@ -17,6 +17,34 @@ local function service(name)
 	return cloneref(game:GetService(name))
 end
 
+local function elevate()
+	local fn = __FrekksHailElevateIdentity
+	if type(fn) == "function" then
+		return pcall(fn)
+	elseif type(setthreadidentity) == "function" then
+		return pcall(setthreadidentity, 8)
+	end
+	return false
+end
+
+-- Executors can drop the thread identity between yields; retry once after
+-- raising it, like the previous library's uiOperation did.
+local function guarded(fn, ...)
+	local ok, result = pcall(fn, ...)
+	if not ok and string.find(tostring(result), "lacking capability", 1, true) then
+		elevate()
+		ok, result = pcall(fn, ...)
+	end
+	if not ok then
+		error(result, 0)
+	end
+	return result
+end
+
+local function makeInstance(class)
+	return guarded(Instance.new, class)
+end
+
 local Players = service("Players")
 local TweenService = service("TweenService")
 local UserInputService = service("UserInputService")
@@ -272,7 +300,7 @@ local function trySet(instance, prop, value)
 	end)
 end
 
-local function new(class, props, children)
+local function newRaw(class, props, children)
 	local inst = Instance.new(class)
 	if inst:IsA("GuiObject") then
 		inst.BorderSizePixel = 0
@@ -309,6 +337,10 @@ local function new(class, props, children)
 	return inst
 end
 
+local function new(class, props, children)
+	return guarded(newRaw, class, props, children)
+end
+
 local function px(n)
 	return UDim.new(0, n)
 end
@@ -318,13 +350,13 @@ local function corner(parent, radius)
 end
 
 local CORNERS_OK = pcall(function()
-	local c = Instance.new("UICorner")
+	local c = makeInstance("UICorner")
 	c.TopLeftRadius = px(1)
 	c:Destroy()
 end)
 
 local function corners(parent, topLeft, topRight, bottomRight, bottomLeft)
-	local c = Instance.new("UICorner")
+	local c = makeInstance("UICorner")
 	if CORNERS_OK then
 		c.TopLeftRadius = px(topLeft)
 		c.TopRightRadius = px(topRight)
@@ -338,7 +370,7 @@ local function corners(parent, topLeft, topRight, bottomRight, bottomLeft)
 end
 
 local function stroke(parent, key, thickness, transparency)
-	local s = Instance.new("UIStroke")
+	local s = makeInstance("UIStroke")
 	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	s.Thickness = thickness or 1
 	s.Transparency = transparency or 0
@@ -372,7 +404,7 @@ end
 
 -- gradient(parent, rotation, keys, transparency): keys is a list of {time, "ThemeKey"} or two theme keys
 local function gradient(parent, rotation, keys, transparency)
-	local g = Instance.new("UIGradient")
+	local g = makeInstance("UIGradient")
 	g.Rotation = rotation or 0
 	if keys then
 		local function build(target)
@@ -434,6 +466,7 @@ local function fire(fn, ...)
 	end
 	local args = table.pack(...)
 	task.spawn(function()
+		elevate()
 		local safe = Library.SafeCallback
 		if type(safe) == "function" then
 			safe(Library, fn, table.unpack(args, 1, args.n))
@@ -721,7 +754,7 @@ end
 ---------------------------------------------------------------------
 
 local SHADOW_OK = pcall(function()
-	Instance.new("UIShadow"):Destroy()
+	makeInstance("UIShadow"):Destroy()
 end)
 
 local glows = setmetatable({}, { __mode = "k" })
@@ -740,7 +773,7 @@ end
 local function glow(parent, opts)
 	local handle = { Base = opts.Transparency or 0.5, Black = opts.Color == "Black" }
 	if SHADOW_OK then
-		local shadow = Instance.new("UIShadow")
+		local shadow = makeInstance("UIShadow")
 		shadow.Name = "Glow"
 		if handle.Black then
 			shadow.Color = BLACK
@@ -904,9 +937,9 @@ end
 ---------------------------------------------------------------------
 
 local function createGlassBlur(target)
-	local folder = Instance.new("Folder")
+	local folder = makeInstance("Folder")
 	folder.Name = HttpService:GenerateGUID(false)
-	local part = Instance.new("Part")
+	local part = makeInstance("Part")
 	part.Name = "Glass"
 	part.Material = Enum.Material.Glass
 	part.Color = BLACK
@@ -918,12 +951,12 @@ local function createGlassBlur(target)
 	part.Size = Vector3.new(1, 1, 0)
 	trySet(part, "CanQuery", false)
 	trySet(part, "CanTouch", false)
-	local mesh = Instance.new("SpecialMesh")
+	local mesh = makeInstance("SpecialMesh")
 	mesh.MeshType = Enum.MeshType.Brick
 	mesh.Offset = Vector3.new(0, 0, -0.000001)
 	mesh.Parent = part
 	part.Parent = folder
-	local dof = Instance.new("DepthOfFieldEffect")
+	local dof = makeInstance("DepthOfFieldEffect")
 	dof.Name = folder.Name
 	dof.FarIntensity = 0
 	dof.FocusDistance = 0.05
