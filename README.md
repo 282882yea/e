@@ -1,3 +1,5 @@
+> **Lunar UI** — the plum glass UI with pixel-art flowers (UIBlur backdrop, UIShadow glow, embedded images) lives in [`lunar/`](lunar/). Paste [`lunar/standalone.lua`](lunar/standalone.lua) into your executor, or see [`lunar/README.md`](lunar/README.md).
+
 # Nova UI
 
 A single-file Roblox UI library for script executors. No image assets, no dependencies.
