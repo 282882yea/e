@@ -69,6 +69,18 @@ def main():
                 end
             end"""),
     ]
+    # The aim runtime's indicator is created from a game-loop thread that can lack
+    # CoreGui access; fall back to raising identity, then to PlayerGui.
+    patches.append(("                gui.Parent = gethui and gethui() or game:GetService('CoreGui')\n",
+        "                gui.Parent = (function()\n"
+        "                    local function host() return gethui and gethui() or game:GetService('CoreGui') end\n"
+        "                    local ok, parent = pcall(host)\n"
+        "                    if ok and parent then return parent end\n"
+        "                    if type(__FrekksHailElevateIdentity) == 'function' then pcall(__FrekksHailElevateIdentity) end\n"
+        "                    ok, parent = pcall(host)\n"
+        "                    if ok and parent then return parent end\n"
+        "                    return game:GetService('Players').LocalPlayer:FindFirstChildOfClass('PlayerGui')\n"
+        "                end)()\n"))
     for old, new in patches:
         assert ported.count(old) == 1, old
         ported = ported.replace(old, new)

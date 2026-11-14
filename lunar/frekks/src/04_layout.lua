@@ -450,17 +450,17 @@ function Tab:AddSubTab(name, iconName)
 		self.Subtabs, self.SubtabByName = {}, {}
 		self.Scroll.Visible = false
 		-- fixed header: title, module count and the sub-tab pills
-		local fixed = new("Frame", { Name = "SubtabHeader", Size = UDim2.new(1, 0, 0, 98), BackgroundTransparency = 1, Parent = self.Page })
+		local fixed = new("Frame", { Name = "SubtabHeader", Size = UDim2.new(1, 0, 0, 102), BackgroundTransparency = 1, Parent = self.Page })
 		self.Heading.Parent = fixed
 		local barHolder = new("Frame", {
 			Name = "SubtabStrip",
-			Position = UDim2.fromOffset(GRID_LEFT, 54),
-			Size = UDim2.new(1, -(GRID_LEFT + GRID_RIGHT), 0, 34),
+			Position = UDim2.fromOffset(GRID_LEFT, 52),
+			Size = UDim2.new(1, -(GRID_LEFT + GRID_RIGHT), 0, 40),
 			BackgroundTransparency = 0,
 			Theme = { BackgroundColor3 = "Control" },
 			Parent = fixed,
 		})
-		corner(barHolder, 17)
+		corner(barHolder, 20)
 		stroke(barHolder, "ControlStroke", 1, 0)
 		local bar = new("ScrollingFrame", {
 			Name = "Subtabs",
@@ -474,16 +474,17 @@ function Tab:AddSubTab(name, iconName)
 			Parent = barHolder,
 		})
 		local row = new("Frame", { Name = "Buttons", Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, ZIndex = 2, Parent = bar })
-		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, SortOrder = Enum.SortOrder.LayoutOrder, Padding = px(4), Parent = row })
+		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder, Padding = px(6), Parent = row })
+		new("UIPadding", { PaddingLeft = px(3), PaddingRight = px(3), Parent = row })
 		self.SubtabBar, self.SubtabButtons = bar, row
-		self.SubArea = new("Frame", { Name = "SubPages", Position = UDim2.fromOffset(0, 98), Size = UDim2.new(1, 0, 1, -98), BackgroundTransparency = 1, ClipsDescendants = true, Parent = self.Page })
+		self.SubArea = new("Frame", { Name = "SubPages", Position = UDim2.fromOffset(0, 102), Size = UDim2.new(1, 0, 1, -102), BackgroundTransparency = 1, ClipsDescendants = true, Parent = self.Page })
 	end
 	local sub = window:_CreateTab(name, iconName, self)
 	sub.ParentTab = self
 	local button = new("ImageButton", {
 		Name = name,
 		LayoutOrder = #self.Subtabs + 1,
-		Size = UDim2.fromScale(0, 1),
+		Size = UDim2.new(0, 0, 1, -8),
 		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundTransparency = 1,
 		ZIndex = 2,

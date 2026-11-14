@@ -844,7 +844,7 @@ function Library:CreateWindow(info)
 	draggable(kbHeader, kb)
 
 	-- mobile toggle -----------------------------------------------------------------------------
-	local mobileGui = new("ScreenGui", { Name = HttpService:GenerateGUID(false), ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = gui.DisplayOrder + 2, Enabled = UserInputService.TouchEnabled or info.ShowMobileToggleOnDesktop == true })
+	local mobileGui = new("ScreenGui", { Name = HttpService:GenerateGUID(false), ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = gui.DisplayOrder + 2, Enabled = (UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and not UserInputService.MouseEnabled) or info.ShowMobileToggleOnDesktop == true })
 	self.MobileToggleGui = mobileGui
 	local mobile = new("ImageButton", { Name = "Toggle", Position = UDim2.fromOffset(16, 80), Size = UDim2.fromOffset(46, 46), BackgroundTransparency = 0.1, Theme = { BackgroundColor3 = "Popup" }, Parent = mobileGui })
 	corner(mobile, 23)
