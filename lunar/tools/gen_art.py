@@ -160,18 +160,19 @@ def erode_specks(cv, rng, p=0.18):
 
 
 def flowers_left(rng):
-    """Top-left: one big blossom in the corner, a cascade hugging the left edge."""
-    W, H = 36, 80
+    """Top-left: one big blossom in the corner, a cascade hugging the left edge.
+    Kept narrow: it hangs over the sidebar icons but must stay clear of the labels."""
+    W, H = 28, 80
     cv = Canvas(W, H)
     # cascade first so the blossom sits on top
     specs = [  # x0, y0, length, r0, sway, lean
-        (3, 6, 70, 4.8, 1.8, 0.01), (8, 5, 64, 5.0, 2.4, 0.04), (14, 8, 56, 4.8, 2.6, 0.08),
-        (20, 10, 46, 4.4, 2.6, 0.10), (26, 9, 30, 3.8, 2.0, 0.10), (5, 30, 46, 4.0, 2.2, 0.03),
-        (11, 34, 38, 3.8, 2.4, 0.07), (17, 40, 26, 3.4, 2.2, 0.08),
+        (3, 6, 70, 4.8, 1.6, 0.00), (7, 5, 64, 5.0, 2.0, 0.03), (12, 8, 56, 4.8, 2.2, 0.05),
+        (16, 10, 46, 4.4, 2.2, 0.06), (20, 9, 32, 3.8, 1.8, 0.05), (5, 30, 46, 4.0, 2.0, 0.02),
+        (10, 34, 38, 3.8, 2.2, 0.05), (15, 40, 26, 3.4, 2.0, 0.05),
     ]
     tips = []
     for x0, y0, L, r0, sw, lean in specs:
-        tips.append(strand(cv, x0, y0, L, rng, r0=r0, sway=sw, lean=lean, base=2.9)[-1])
+        tips.append(strand(cv, x0, y0, L, rng, r0=r0, r1=1.8, sway=sw, lean=lean, base=2.9)[-1])
     erode_specks(cv, rng)
     sparkle(cv, rng, 0.009, lo=5.4, hi=7.0)
     for x, y, r in tips:
@@ -181,23 +182,23 @@ def flowers_left(rng):
         i = rng.randrange(len(xs))
         if ys[i] > 26:
             star(cv, xs[i], ys[i], rng)
-    petal_flower(cv, 12, 10, 11, rng, petals=5, rot=0.5, base=4.9)
+    petal_flower(cv, 11, 10, 10, rng, petals=5, rot=0.5, base=4.9)
     return cv
 
 
 def flowers_right(rng):
-    """Top-right: large blossom in the corner and a full cascade down the right edge."""
-    W, H = 46, 118
+    """Top-right: large blossom in the corner and a broad cascade down the right edge."""
+    W, H = 46, 116
     cv = Canvas(W, H)
     specs = [
-        (43, 16, 96, 5.4, 2.0, -0.01), (38, 18, 92, 5.6, 2.8, -0.03), (32, 22, 84, 5.4, 3.0, -0.06),
-        (26, 26, 70, 5.0, 3.0, -0.08), (20, 30, 52, 4.4, 2.6, -0.10), (14, 36, 30, 3.8, 2.2, -0.10),
-        (41, 56, 58, 4.8, 2.2, -0.02), (35, 58, 54, 4.6, 2.6, -0.05), (29, 64, 44, 4.2, 2.6, -0.07),
-        (23, 70, 28, 3.6, 2.2, -0.08),
+        (43, 16, 94, 5.6, 1.8, -0.01), (38, 18, 92, 5.8, 2.6, -0.03), (33, 20, 88, 5.6, 2.8, -0.05),
+        (28, 24, 80, 5.4, 2.8, -0.06), (23, 28, 68, 5.0, 2.6, -0.07), (18, 32, 52, 4.6, 2.4, -0.08),
+        (13, 38, 34, 4.0, 2.0, -0.08), (41, 54, 56, 5.0, 2.0, -0.02), (36, 56, 54, 4.8, 2.4, -0.04),
+        (31, 60, 48, 4.6, 2.4, -0.05), (26, 64, 38, 4.2, 2.2, -0.06), (21, 70, 24, 3.6, 2.0, -0.06),
     ]
     tips = []
     for x0, y0, L, r0, sw, lean in specs:
-        tips.append(strand(cv, x0, y0, L, rng, r0=r0, sway=sw, lean=lean, base=2.9)[-1])
+        tips.append(strand(cv, x0, y0, L, rng, r0=r0, r1=2.2, sway=sw, lean=lean, base=2.9)[-1])
     erode_specks(cv, rng)
     sparkle(cv, rng, 0.009, lo=5.4, hi=7.0)
     for x, y, r in tips:

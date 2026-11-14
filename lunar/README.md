@@ -2,6 +2,10 @@
 
 A single-file Roblox UI library for script executors, built to match the Lunar reference design: plum glass window, pixel-art flower cascades, serif navigation, two-column module cards.
 
+![Layout preview](preview.jpg)
+
+*Layout preview rendered by the test harness described at the bottom, not a capture from a Roblox client.*
+
 - Backdrop blur with `UIBlur`, falling back to the glass-part trick on clients without it
 - Every glow is a `UIShadow` (9-slice image fallback on older clients)
 - Flowers, backdrop and icons are images, embedded in the script and written to the executor workspace on first run — nothing is downloaded

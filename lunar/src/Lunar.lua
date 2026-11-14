@@ -227,8 +227,6 @@ local function stroke(parent, color, thickness, transparency)
 	s.Color = color
 	s.Thickness = thickness or 1
 	s.Transparency = transparency or 0
-	-- keeps hairlines proportional when the window is scaled
-	trySet(s, "StrokeSizingMode", Enum.StrokeSizingMode.ScaledSize)
 	s.Parent = parent
 	return s
 end
@@ -466,6 +464,10 @@ local function glow(parent, opts)
 		if opts.Inset then
 			trySet(shadow, "Inset", true)
 		end
+		-- shadow of the frame, not of a button's text
+		pcall(function()
+			shadow.Mode = Enum.ApplyShadowMode.Shape
+		end)
 		-- only the halo around the shape, never a tint underneath translucent parents
 		trySet(shadow, "ShowBehindParent", false)
 		shadow.Parent = parent
@@ -2497,6 +2499,7 @@ function Lunar:CreateWindow(cfg)
 	local gui = new("ScreenGui", {
 		Name = HttpService:GenerateGUID(false),
 		ResetOnSpawn = false,
+		AutoLocalize = false,
 		IgnoreGuiInset = true,
 		DisplayOrder = cfg.DisplayOrder or 9999,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
@@ -2844,18 +2847,18 @@ function Lunar:CreateWindow(cfg)
 		tween(grip, 0.3, { ImageColor3 = rgb(150, 128, 146) })
 	end)
 
-	-- flowers: the right cascade hangs over the cards (it does not sink input)
+	-- flowers hang over the content like the reference; ImageLabels do not sink input
 	local artSizes = EMBEDDED.sizes or {}
-	local leftSize = artSizes.flowers_left or { 36, 80 }
-	local rightSize = artSizes.flowers_right or { 46, 118 }
+	local leftSize = artSizes.flowers_left or { 28, 80 }
+	local rightSize = artSizes.flowers_right or { 46, 116 }
 	local leftArt = new("ImageLabel", {
 		Name = "FlowersLeft",
 		Position = UDim2.fromOffset(2, 1),
 		Size = UDim2.fromOffset(leftSize[1] * 2, leftSize[2] * 2), -- one art pixel = 2 design px
 		Image = Assets.flowers_left,
-		ImageTransparency = 0.14,
+		ImageTransparency = 0.28, -- the sidebar icons stay readable through it
 		ResampleMode = Enum.ResamplerMode.Pixelated,
-		ZIndex = 4, -- behind the sidebar text, like the reference
+		ZIndex = 20,
 		Parent = root,
 	})
 	local rightArt = new("ImageLabel", {
