@@ -57,30 +57,9 @@ function Window:_hideTooltip()
 end
 
 function Window:_updateThumb()
-	local tab = self.ActiveTab
-	if tab and tab.Subtabs then
-		tab = tab.ActiveSubtab
+	if self._thumb then
+		self._thumb.Visible = false
 	end
-	local thumb = self._thumb
-	if not tab or not tab.Scroll then
-		thumb.Visible = false
-		return
-	end
-	local scroll = tab.Scroll
-	local view = scroll.AbsoluteWindowSize.Y
-	local canvas = scroll.AbsoluteCanvasSize.Y
-	if view <= 0 or canvas <= view + 1 then
-		thumb.Visible = false
-		return
-	end
-	local scale = self._scale
-	local top = (scroll.AbsolutePosition.Y - self.Root.AbsolutePosition.Y) / scale + 2
-	local trackLength = view / scale - 4
-	local length = math.max(28, trackLength * view / canvas)
-	local progress = math.clamp(scroll.CanvasPosition.Y / (canvas - view), 0, 1)
-	thumb.Visible = true
-	thumb.Size = UDim2.fromOffset(6, round(length))
-	thumb.Position = UDim2.new(1, -9, 0, round(top + (trackLength - length) * progress))
 end
 
 function Window:_updateCrumb()
@@ -110,19 +89,9 @@ function Window:_CreateTab(name, iconName, parentTab)
 		Parent = parentTab and parentTab.SubArea or self.Pages,
 	})
 	tab.Page = page
-	local scroll = new("ScrollingFrame", {
-		Name = "Scroll",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		CanvasSize = UDim2.new(),
-		ScrollBarThickness = 0,
-		ScrollBarImageTransparency = 1,
-		ScrollingDirection = Enum.ScrollingDirection.Y,
-		ElasticBehavior = Enum.ElasticBehavior.Never,
-		Parent = page,
-	})
+	-- heading stays put; each column scrolls on its own
+	local scroll = new("Frame", { Name = "Scroll", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = page })
 	tab.Scroll = scroll
-	tab.Sides = { scroll, scroll }
 
 	local gridTop = 12
 	if not parentTab then
@@ -161,25 +130,35 @@ function Window:_CreateTab(name, iconName, parentTab)
 		gridTop = 53
 	end
 	tab.GridTop = gridTop
-	local grid = new("Frame", { Name = "Grid", Position = UDim2.fromOffset(GRID_LEFT, gridTop), Size = UDim2.new(1, -(GRID_LEFT + GRID_RIGHT), 0, 0), BackgroundTransparency = 1, Parent = scroll })
+	local grid = new("Frame", { Name = "Grid", Position = UDim2.fromOffset(GRID_LEFT - 4, gridTop - 6), Size = UDim2.new(1, -(GRID_LEFT + 6), 1, -(gridTop - 6)), BackgroundTransparency = 1, Parent = scroll })
 	tab.Grid = grid
 	local function column(colName, x)
-		local col = new("Frame", {
+		local col = new("ScrollingFrame", {
 			Name = colName,
-			Position = UDim2.new(x, x > 0 and COLUMN_GAP / 2 or 0, 0, 0),
-			Size = UDim2.new(0.5, -COLUMN_GAP / 2, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
+			Position = UDim2.new(x, x > 0 and COLUMN_GAP / 2 - 4 or 0, 0, 0),
+			Size = UDim2.new(0.5, -COLUMN_GAP / 2 + 4, 1, 0),
 			BackgroundTransparency = 1,
+			CanvasSize = UDim2.new(),
+			ScrollBarThickness = 3,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+			ElasticBehavior = Enum.ElasticBehavior.Never,
+			VerticalScrollBarInset = Enum.ScrollBarInset.None,
+			Theme = { ScrollBarImageColor3 = "Thumb" },
 			Parent = grid,
 		})
+		new("UIPadding", { PaddingLeft = px(4), PaddingRight = px(8), PaddingTop = px(6), PaddingBottom = px(14), Parent = col })
 		local list = new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = px(CARD_GAP), Parent = col })
 		list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 			tab:_RefreshCanvas()
+		end)
+		col:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+			self:_closePopup()
 		end)
 		return col, list
 	end
 	tab.Left, tab.LeftList = column("Left", 0)
 	tab.Right, tab.RightList = column("Right", 0.5)
+	tab.Sides = { tab.Left, tab.Right }
 	tab.Empty = new("TextLabel", {
 		Name = "Empty",
 		Position = UDim2.fromOffset(14, gridTop + 8),
@@ -192,17 +171,6 @@ function Window:_CreateTab(name, iconName, parentTab)
 		Theme = { TextColor3 = "SubText" },
 		Parent = scroll,
 	})
-	scroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-		self:_closePopup()
-		self:_updateThumb()
-	end)
-	scroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(function()
-		self:_updateThumb()
-	end)
-	scroll:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(function()
-		self:_updateThumb()
-	end)
-
 	table.insert(self.Tabs, tab)
 	Library.Tabs[name] = tab
 	return tab
@@ -297,9 +265,8 @@ function Window:_SelectTab(tab, instant)
 	else
 		self:_movePill(false)
 		local inner = tab.Subtabs and tab.ActiveSubtab or tab
-		inner.Scroll.CanvasPosition = Vector2.new(0, 0)
-		inner.Grid.Position = UDim2.fromOffset(GRID_LEFT, inner.GridTop + 16)
-		tween(inner.Grid, 0.4, { Position = UDim2.fromOffset(GRID_LEFT, inner.GridTop) })
+		inner.Grid.Position = UDim2.fromOffset(GRID_LEFT - 4, inner.GridTop + 10)
+		tween(inner.Grid, 0.4, { Position = UDim2.fromOffset(GRID_LEFT - 4, inner.GridTop - 6) })
 		fade(tab.Page, true, 0.22)
 	end
 	if self.Search.Text ~= "" then

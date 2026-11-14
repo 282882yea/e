@@ -346,16 +346,12 @@ function Tab:_RefreshCanvas()
 	self._canvasQueued = true
 	task.defer(function()
 		self._canvasQueued = false
-		if not self.Scroll or not self.Scroll.Parent then
+		if not self.Left or not self.Left.Parent then
 			return
 		end
 		local scale = self.Window._scale
-		local left = self.LeftList.AbsoluteContentSize.Y / scale
-		local right = self.RightList.AbsoluteContentSize.Y / scale
-		local height = math.max(left, right)
-		self.Grid.Size = UDim2.new(1, -(GRID_LEFT + GRID_RIGHT), 0, height)
-		self.Scroll.CanvasSize = UDim2.fromOffset(0, self.GridTop + height + 14)
-		self.Window:_updateThumb()
+		self.Left.CanvasSize = UDim2.fromOffset(0, self.LeftList.AbsoluteContentSize.Y / scale + 20)
+		self.Right.CanvasSize = UDim2.fromOffset(0, self.RightList.AbsoluteContentSize.Y / scale + 20)
 	end)
 end
 
@@ -385,7 +381,8 @@ function Tab:_SetSelected(selected)
 	if self.ParentTab then
 		local button = self.SubtabButton
 		if button then
-			tween(button, 0.2, { BackgroundTransparency = selected and 0.12 or 1 })
+			tween(button, 0.2, { BackgroundTransparency = selected and 0 or 1 })
+			tween(self.SubtabStroke, 0.2, { Transparency = selected and 0 or 1 })
 			tween(self.SubtabLabel, 0.2, { TextColor3 = selected and Theme.TextBright or Theme.SubText })
 			tween(self.SubtabIcon, 0.2, { ImageColor3 = selected and Theme.TextBright or Theme.SubText })
 		end
@@ -415,28 +412,11 @@ function Tab:_SelectSubTab(sub)
 	self.ActiveSubtab = sub
 	sub:_SetSelected(true)
 	if previous and window.Visible then
-		sub.Scroll.CanvasPosition = Vector2.new(0, 0)
-		sub.Grid.Position = UDim2.fromOffset(GRID_LEFT, sub.GridTop + 14)
-		tween(sub.Grid, 0.4, { Position = UDim2.fromOffset(GRID_LEFT, sub.GridTop) })
+		sub.Grid.Position = UDim2.fromOffset(GRID_LEFT - 4, sub.GridTop + 8)
+		tween(sub.Grid, 0.4, { Position = UDim2.fromOffset(GRID_LEFT - 4, sub.GridTop - 6) })
 		fade(sub.Page, true, 0.2)
 	else
 		sub.Page.Visible = true
-	end
-	local pill = self.SubtabPill
-	if pill and sub.SubtabButton then
-		local bar = self.SubtabBar
-		local scale = window._scale
-		local x = (sub.SubtabButton.AbsolutePosition.X - bar.AbsolutePosition.X) / scale
-		local w = sub.SubtabButton.AbsoluteSize.X / scale
-		if previous and w > 0 then
-			tween(pill, 0.36, { Position = UDim2.fromOffset(x, 0), Size = UDim2.new(0, w, 1, 0) }, Enum.EasingStyle.Back)
-		else
-			task.defer(function()
-				local s = window._scale
-				pill.Position = UDim2.fromOffset((sub.SubtabButton.AbsolutePosition.X - bar.AbsolutePosition.X) / s, 0)
-				pill.Size = UDim2.new(0, sub.SubtabButton.AbsoluteSize.X / s, 1, 0)
-			end)
-		end
 	end
 	self:_UpdateCount()
 	if window.Search and window.Search.Text ~= "" then
@@ -493,13 +473,9 @@ function Tab:AddSubTab(name, iconName)
 			ScrollBarThickness = 0,
 			Parent = barHolder,
 		})
-		local pill = new("Frame", { Name = "Selection", Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = WHITE, BackgroundTransparency = 0, ZIndex = 1, Parent = bar })
-		corner(pill, 14)
-		gradient(pill, 0, { "PillA", "PillB" }, numberSeq(0, 0.84, 0.55, 0.9, 1, 0.94))
-		stroke(pill, "PillStroke", 1.5, 0)
 		local row = new("Frame", { Name = "Buttons", Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, ZIndex = 2, Parent = bar })
 		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, SortOrder = Enum.SortOrder.LayoutOrder, Padding = px(4), Parent = row })
-		self.SubtabBar, self.SubtabButtons, self.SubtabPill = bar, row, pill
+		self.SubtabBar, self.SubtabButtons = bar, row
 		self.SubArea = new("Frame", { Name = "SubPages", Position = UDim2.fromOffset(0, 98), Size = UDim2.new(1, 0, 1, -98), BackgroundTransparency = 1, ClipsDescendants = true, Parent = self.Page })
 	end
 	local sub = window:_CreateTab(name, iconName, self)
@@ -513,6 +489,10 @@ function Tab:AddSubTab(name, iconName)
 		ZIndex = 2,
 		Parent = self.SubtabButtons,
 	})
+	button.BackgroundColor3 = WHITE
+	corner(button, 14)
+	sub.SubtabFill = gradient(button, 0, { "PillA", "PillB" }, numberSeq(0, 0.84, 0.55, 0.9, 1, 0.94))
+	sub.SubtabStroke = stroke(button, "PillStroke", 1.5, 1)
 	new("UIPadding", { PaddingLeft = px(12), PaddingRight = px(14), Parent = button })
 	new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder, Padding = px(7), Parent = button })
 	sub.SubtabIcon = icon(iconName or name, 15, "SubText", { LayoutOrder = 1, ZIndex = 2, Parent = button })
