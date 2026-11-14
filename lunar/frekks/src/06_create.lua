@@ -285,9 +285,7 @@ function Library:CreateWindow(info)
 			ScaleType = Enum.ScaleType.Fit,
 			Parent = brand,
 		})
-		self.BrandLogo = logo
-		local shine = glow(logo, { Blur = 14, Transparency = 0.86 })
-		self:_loop(shine, 0.7, 2.4)
+		self.BrandLogo = logo -- the artwork has its own glow; a UIShadow would trace the image rectangle
 	else
 		icon("moon", 18, "Brand", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(25, 26), Parent = brand })
 		new("TextLabel", {

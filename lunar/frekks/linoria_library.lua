@@ -4093,9 +4093,8 @@ function Tab:AddSubTab(name, iconName)
 		})
 		local pill = new("Frame", { Name = "Selection", Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = WHITE, BackgroundTransparency = 0, ZIndex = 1, Parent = bar })
 		corner(pill, 14)
-		gradient(pill, 0, { "PillA", "PillB" }, numberSeq(0, 0.7, 1, 0.82))
+		gradient(pill, 0, { "PillA", "PillB" }, numberSeq(0, 0.84, 0.55, 0.9, 1, 0.94))
 		stroke(pill, "PillStroke", 1.5, 0)
-		glow(pill, { Blur = 12, Transparency = 0.6 })
 		local row = new("Frame", { Name = "Buttons", Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, ZIndex = 2, Parent = bar })
 		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, SortOrder = Enum.SortOrder.LayoutOrder, Padding = px(4), Parent = row })
 		self.SubtabBar, self.SubtabButtons, self.SubtabPill = bar, row, pill
@@ -5328,9 +5327,7 @@ function Library:CreateWindow(info)
 			ScaleType = Enum.ScaleType.Fit,
 			Parent = brand,
 		})
-		self.BrandLogo = logo
-		local shine = glow(logo, { Blur = 14, Transparency = 0.86 })
-		self:_loop(shine, 0.7, 2.4)
+		self.BrandLogo = logo -- the artwork has its own glow; a UIShadow would trace the image rectangle
 	else
 		icon("moon", 18, "Brand", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(25, 26), Parent = brand })
 		new("TextLabel", {
