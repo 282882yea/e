@@ -224,6 +224,11 @@ def visuals(text):
     text = swap(text,
         "            RivalsRuntimeBridge.WorldVisuals.WorldPresetOrder = {\n"
         "                'Game Default', 'Competitive Clarity', 'Sunny Day', 'Golden Hour',\n",
+        "            RivalsRuntimeBridge.WorldVisuals.WorldPresetOrder = {\n"
+        "                'Game Default', 'Competitive Clarity', 'Dreamy Haze', 'Sakura Sunset', 'Frozen Night', 'Sunny Day', 'Golden Hour',\n")
+    # new themes are added after the WorldPresets table exists
+    text = swap(text,
+        "            function RivalsRuntimeBridge.WorldVisuals.ApplyWorldPreset(name)\n",
         "            RivalsRuntimeBridge.WorldVisuals.WorldPresets['Dreamy Haze'] = {\n"
         "                Toggles = { P1S4T2 = true, P1S4T3 = true, P1S4T4 = true, P1S4T5 = true, P1S4T7 = true,\n"
         "                    P1S6T1 = true, P1S7T1 = true, P1S10T1 = true, P1S13T1 = true },\n"
@@ -250,8 +255,145 @@ def visuals(text):
         "                Colors = { P1S4C1 = {150, 100, 120}, P1S4C2 = {230, 160, 170}, P1S4C3 = {255, 180, 140}, P1S4C4 = {180, 110, 170},\n"
         "                    P1S7C1 = {255, 228, 228}, P1S13C1 = {255, 170, 150}, P1S13C2 = {180, 80, 120} },\n"
         "            }\n"
-        "            RivalsRuntimeBridge.WorldVisuals.WorldPresetOrder = {\n"
-        "                'Game Default', 'Competitive Clarity', 'Dreamy Haze', 'Sakura Sunset', 'Frozen Night', 'Sunny Day', 'Golden Hour',\n")
+        "            function RivalsRuntimeBridge.WorldVisuals.ApplyWorldPreset(name)\n")
+    return feedback_and_cosmetics(text)
+
+
+PLAY_SOUND = r"""            -- Sounds are preloaded once per name and cloned per hit. A sound the game is not
+            -- allowed to load (private audio) falls back to an engine sound instead of silence.
+            function RivalsRuntimeBridge.CombatFeedback.PlaySound(name, volume, pitch)
+                local feedback = RivalsRuntimeBridge.CombatFeedback
+                local asset = feedback.ResolveSoundAsset(name)
+                if not asset then
+                    return
+                end
+                local soundService = game:GetService('SoundService')
+                feedback.SoundTemplates = feedback.SoundTemplates or {}
+                local function make(id)
+                    local ok, sound = pcall(function()
+                        local s = Instance.new('Sound')
+                        s.Name = 'FrekksHailCombatFeedback'
+                        s.SoundId = id
+                        s.Parent = soundService
+                        return s
+                    end)
+                    if not ok and type(__FrekksHailElevateIdentity) == 'function' then
+                        pcall(__FrekksHailElevateIdentity)
+                        ok, sound = pcall(function()
+                            local s = Instance.new('Sound')
+                            s.Name = 'FrekksHailCombatFeedback'
+                            s.SoundId = id
+                            s.Parent = soundService
+                            return s
+                        end)
+                    end
+                    return ok and sound or nil
+                end
+                local record = feedback.SoundTemplates[name]
+                if not record or record.Asset ~= asset or not record.Sound or record.Sound.Parent == nil then
+                    record = { Asset = asset, Sound = make(asset), Born = os.clock(), Failed = false }
+                    feedback.SoundTemplates[name] = record
+                end
+                local template = record.Sound
+                if template and not record.Failed and not template.IsLoaded and os.clock() - record.Born > 2.5 then
+                    record.Failed = true
+                    pcall(function()
+                        Library:Notify('Hit sound "' .. tostring(name) .. '" could not be loaded in this game. Playing the default ping instead.', 5)
+                    end)
+                end
+                if not template or record.Failed then
+                    local fallback = feedback.SoundTemplates['\0fallback']
+                    if not fallback or not fallback.Sound or fallback.Sound.Parent == nil then
+                        fallback = { Sound = make('rbxasset://sounds/electronicpingshort.wav') }
+                        feedback.SoundTemplates['\0fallback'] = fallback
+                    end
+                    template = fallback.Sound
+                end
+                if not template then
+                    return
+                end
+                pcall(function()
+                    local sound = template:Clone()
+                    sound.Volume = math.max(0, tonumber(volume) or 1)
+                    sound.PlaybackSpeed = math.max(0.01, tonumber(pitch) or 1)
+                    sound.Parent = soundService
+                    game:GetService('Debris'):AddItem(sound, 12)
+                    sound:Play()
+                end)
+            end
+
+"""
+
+
+def feedback_and_cosmetics(text):
+    # --- Hit sounds -----------------------------------------------------------------
+    text = between(text,
+        "            function RivalsRuntimeBridge.CombatFeedback.PlaySound(name, volume, pitch)\n",
+        "            function RivalsRuntimeBridge.CombatFeedback.CreateChams(", PLAY_SOUND)
+    text = swap(text,
+        "                BuiltInSounds = {\n",
+        "                BuiltInSounds = {\n"
+        "                    -- engine sounds: always available, no asset permissions involved\n"
+        "                    { name = 'Ping (always works)', soundId = 'rbxasset://sounds/electronicpingshort.wav' },\n"
+        "                    { name = 'Snap (always works)', soundId = 'rbxasset://sounds/snap.mp3' },\n"
+        "                    { name = 'Click (always works)', soundId = 'rbxasset://sounds/clickfast.wav' },\n"
+        "                    { name = 'Bass (always works)', soundId = 'rbxasset://sounds/bass.wav' },\n"
+        "                    { name = 'Classic Oof (always works)', soundId = 'rbxasset://sounds/uuhhh.mp3' },\n"
+        "                    { name = 'Sword Slash (always works)', soundId = 'rbxasset://sounds/swordslash.wav' },\n")
+
+    # --- Cosmetics window ----------------------------------------------------------
+    text = swap(text,
+        "    gui.ZIndexBehavior = Enum.ZIndexBehavior.Global;\n    gui.Parent = coreGui;\n",
+        "    gui.ZIndexBehavior = Enum.ZIndexBehavior.Global;\n"
+        "    pcall(function() gui.IgnoreGuiInset = true end);\n"
+        "    do\n"
+        "        -- parent like the menu does: hidden UI, then CoreGui with raised identity, then PlayerGui\n"
+        "        local function try(getParent)\n"
+        "            return pcall(function() gui.Parent = getParent() end) and gui.Parent ~= nil\n"
+        "        end\n"
+        "        local placed = type(gethui) == 'function' and try(gethui)\n"
+        "        if not placed then placed = try(function() return coreGui end) end\n"
+        "        if not placed and type(__FrekksHailElevateIdentity) == 'function' then\n"
+        "            pcall(__FrekksHailElevateIdentity)\n"
+        "            placed = try(function() return coreGui end)\n"
+        "        end\n"
+        "        if not placed then try(function() return ctx.player:FindFirstChildOfClass('PlayerGui') end) end\n"
+        "    end\n")
+    text = swap(text, "    outer.Draggable = true;\n", "")
+    text = swap(text,
+        "    title.Text = \"Frekks Hail v3 | Cosmetics\";\n    title.Parent = top;\n",
+        "    title.Text = \"Frekks Hail v3 | Cosmetics\";\n    title.Parent = top;\n"
+        "    do\n"
+        "        -- drag by the title bar only, so lists and buttons do not move the window\n"
+        "        local dragStart, dragOrigin\n"
+        "        top.Active = true\n"
+        "        top.InputBegan:Connect(function(input)\n"
+        "            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then\n"
+        "                dragStart, dragOrigin = input.Position, outer.Position\n"
+        "            end\n"
+        "        end)\n"
+        "        local dragMove = userInput.InputChanged:Connect(function(input)\n"
+        "            if not dragStart or resizing then return end\n"
+        "            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then\n"
+        "                local delta = input.Position - dragStart\n"
+        "                outer.Position = UDim2.new(dragOrigin.X.Scale, dragOrigin.X.Offset + delta.X, dragOrigin.Y.Scale, dragOrigin.Y.Offset + delta.Y)\n"
+        "            end\n"
+        "        end)\n"
+        "        local dragEnd = userInput.InputEnded:Connect(function(input)\n"
+        "            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragStart = nil end\n"
+        "        end)\n"
+        "        Library:GiveSignal(dragMove); Library:GiveSignal(dragEnd)\n"
+        "        gui.Destroying:Connect(function() dragMove:Disconnect(); dragEnd:Disconnect() end)\n"
+        "        -- rounded corners to match the menu\n"
+        "        for frame, radius in pairs({ [outer] = 10, [inner] = 9, [panel] = 8, [top] = 8 }) do\n"
+        "            local corner = Instance.new('UICorner'); corner.CornerRadius = UDim.new(0, radius); corner.Parent = frame\n"
+        "        end\n"
+        "        accentBar.Position = UDim2.new(0, 10, 0, 0); accentBar.Size = UDim2.new(1, -20, 0, 2)\n"
+        "        local resizerCorner = Instance.new('UICorner'); resizerCorner.CornerRadius = UDim.new(0, 4); resizerCorner.Parent = resizer\n"
+        "    end\n")
+    text = swap(text,
+        "        outer.BackgroundColor3 = Color3.new(0, 0, 0);\n        inner.BackgroundColor3 = main;\n",
+        "        outer.BackgroundColor3 = accent:Lerp(outline, 0.55);\n        inner.BackgroundColor3 = main;\n")
     return text
 
 
