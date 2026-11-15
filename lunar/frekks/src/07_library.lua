@@ -3,6 +3,7 @@
 ---------------------------------------------------------------------
 
 Library.Theme = Theme
+Library.Assets = Assets -- image ids, e.g. Library.Assets.snowball for the weather particles
 Library.FontColor = BASE.font
 Library.MainColor = BASE.main
 Library.AccentColor = BASE.accent

@@ -40,7 +40,7 @@ def module_source():
     marker = "local EMBEDDED = {} --@EMBED@"
     assert marker in source, "embed marker missing"
     source = luraph_attributes(source)
-    return source.replace(marker, "local EMBEDDED = " + embedded({"logo": os.path.join(ROOT, "frekks", "logo.png")}))
+    return source.replace(marker, "local EMBEDDED = " + embedded({"logo": os.path.join(ROOT, "frekks", "logo.png"), "snowball": os.path.join(ROOT, "frekks", "snowball.png")}))
 
 
 def main():

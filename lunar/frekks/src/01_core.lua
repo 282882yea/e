@@ -638,7 +638,7 @@ local function ensureFolder(path)
 	return true
 end
 
-local ASSET_NAMES = { "background", "blossoms", "flowers_left", "flowers_right", "petal", "glow", "icons", "logo" }
+local ASSET_NAMES = { "background", "blossoms", "flowers_left", "flowers_right", "petal", "glow", "icons", "logo", "snowball" }
 
 local function loadAssets(folder)
 	local getasset = getcustomasset or getsynasset
