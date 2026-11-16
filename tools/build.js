@@ -47,7 +47,12 @@ function sceneBlock() {
 	for (const g of scene.groups) {
 		const { data, count } = encode(g.rects);
 		total += count;
-		lines.push(`\t{ "${g.anchor}", ${g.w}, ${g.h}, "${data}" }, -- ${g.name}: ${count} rectangles`);
+		// Short lines: some executor editors cut off very long ones when pasting.
+		const chunks = [];
+		for (let i = 0; i < data.length; i += 98) chunks.push(`\t\t"${data.slice(i, i + 98)}",`);
+		lines.push(`\t{ "${g.anchor}", ${g.w}, ${g.h}, { -- ${g.name}: ${count} rectangles`);
+		lines.push(...chunks);
+		lines.push('\t} },');
 	}
 	lines.push('}');
 	lines.push('-- Colours are RRGGBB or RRGGBBAA (AA = opacity).');
