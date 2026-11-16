@@ -159,6 +159,15 @@ Lighting:AddSlider({
 	end,
 })
 
+-- A tabbox: one groupbox with its own little tabs
+local Extras = World:AddRightTabbox()
+local Fog = Extras:AddTab("fog")
+Fog:AddToggle({ Name = "no fog", Flag = "NoFog", Callback = print })
+Fog:AddSlider({ Name = "fog distance", Min = 100, Max = 5000, Increment = 50, Default = 1500, Flag = "FogDistance" })
+local Sky = Extras:AddTab("sky")
+Sky:AddToggle({ Name = "always day", Flag = "AlwaysDay" })
+Sky:AddColorPicker({ Name = "sky tint", Default = Color3.fromRGB(255, 190, 220), Flag = "SkyTint" })
+
 -- Visuals tab: three columns -------------------------------------------
 local Visuals = Window:AddTab("visuals")
 

@@ -1,0 +1,10 @@
+-- frekksec lua on the Sakura UI. Paste the whole file into your executor.
+-- The helper itself (movement, targets, configs, fake position, lunar modes) is v1.8.0 of
+-- "Frekksec with CrimsonUI", unchanged. Only the interface was rebuilt on Sakura UI,
+-- which is bundled below: tabs and sub-tabs along the top, pixel flowers, a Tokyo
+-- blossom backdrop, UIShadow glow, UIBlur glass, and the live movement preview docked
+-- beside the pages.
+-- Fake Position > Visuals > Ghost height above surface: logarithmic + exact input.
+-- API: getgenv().frekksec:SetFakePositionHeight(100)
+-- F6: helper; X: fake position; End: panic/return; Insert: menu (configurable).
+-- The elevated ghost is local-only; extreme-height rendering is unverified.

@@ -26,7 +26,7 @@ local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 
 local Library = {
-	Version = "1.0.0",
+	Version = "1.1.0",
 	Flags = {}, -- [flag] = current value
 	Options = {}, -- [flag] = element object
 	Themes = {},
@@ -36,9 +36,14 @@ local Library = {
 	-- Which of the newer UI instances this client can create.
 	Support = { UIShadow = false, UIBlur = false },
 	-- Glow drawn with UIShadow. Change through Library:SetGlow.
-	Glow = { Enabled = true, Size = 32, Spread = 2, Strength = 0.7, Pulse = true, Elements = true, Color = nil },
+	Glow = {
+		Enabled = true, Size = 32, Spread = 2, Strength = 0.7, ElementStrength = 0.6,
+		Pulse = true, Elements = true, Color = nil, SurfaceColor = nil, ControlColor = nil,
+	},
 	-- Frosted panels drawn with UIBlur. Change through Library:SetGlass.
 	Glass = { Blur = "Medium", Transparency = 0.28 },
+	-- Toast placement. Change through Library:SetNotifications.
+	Notifications = { Side = "Right", Anchor = "Bottom", Max = 5 },
 	-- Falling petals. Change through Library:SetPetals.
 	Petals = { Enabled = true, Count = 16, Speed = 1 },
 	_connections = {},
@@ -891,8 +896,16 @@ end
 
 local glows = {}
 
-local function glowColor()
-	return Library.Glow.Color or Library.Theme.Glow or Library.Theme.Accent
+-- "window" and "image" glows use SurfaceColor; controls use ControlColor.
+local function glowColor(kind)
+	local settings = Library.Glow
+	local specific
+	if kind == "window" or kind == "image" then
+		specific = settings.SurfaceColor
+	else
+		specific = settings.ControlColor
+	end
+	return specific or settings.Color or Library.Theme.Glow or Library.Theme.Accent
 end
 
 local function writeGlow(entry, pulse)
@@ -905,7 +918,7 @@ local function writeGlow(entry, pulse)
 		local reach = math.floor(size * 1.4) + settings.Spread
 		shadow.Visible = settings.Enabled
 		shadow.Size = UDim2.new(1, reach * 2, 1, reach * 2)
-		shadow.ImageColor3 = glowColor()
+		shadow.ImageColor3 = glowColor("image")
 		shadow.ImageTransparency = 1 - strength * (pulse or 1)
 		return
 	end
@@ -917,13 +930,13 @@ local function writeGlow(entry, pulse)
 	elseif entry.kind == "text" then
 		shadow.Enabled = settings.Enabled and settings.Elements
 		shadow.BlurRadius = UDim.new(0, math.max(2, math.floor(size * 0.2)))
-		shadow.Transparency = 1 - strength * 0.9
+		shadow.Transparency = 1 - math.clamp(settings.ElementStrength, 0, 1) * 0.9
 	else
 		shadow.Enabled = settings.Enabled and settings.Elements and entry.on
 		shadow.BlurRadius = UDim.new(0, math.max(2, math.floor(size * 0.25)))
-		shadow.Transparency = 1 - strength * 0.85
+		shadow.Transparency = 1 - math.clamp(settings.ElementStrength, 0, 1)
 	end
-	shadow.Color = glowColor()
+	shadow.Color = glowColor(entry.kind)
 end
 
 local function applyGlow(entry, pulse)
@@ -980,12 +993,14 @@ local function setGlowOn(entry, on)
 	end
 end
 
--- Library:SetGlow({ Enabled, Size, Spread, Strength, Pulse, Elements, Color })
--- Size and Spread are pixels, Strength is 0..1. Color = false follows the accent.
+-- Library:SetGlow({ Enabled, Size, Spread, Strength, ElementStrength, Pulse, Elements,
+--                   Color, SurfaceColor, ControlColor })
+-- Size and Spread are pixels, strengths are 0..1. A colour set to false follows the
+-- accent again. SurfaceColor tints the window glow, ControlColor the small glows.
 function Library:SetGlow(settings)
 	for key, value in pairs(settings or {}) do
-		if key == "Color" and value == false then
-			self.Glow.Color = nil
+		if (key == "Color" or key == "SurfaceColor" or key == "ControlColor") and value == false then
+			self.Glow[key] = nil
 		else
 			self.Glow[key] = value
 		end
@@ -1313,6 +1328,40 @@ end
 
 local notifyHolder
 local watermark
+local toasts = {}
+
+local function placeNotifications()
+	if not notifyHolder then
+		return
+	end
+	local settings = Library.Notifications
+	local right = settings.Side ~= "Left"
+	local bottom = settings.Anchor ~= "Top"
+	notifyHolder.AnchorPoint = Vector2.new(right and 1 or 0, bottom and 1 or 0)
+	notifyHolder.Position = UDim2.new(right and 1 or 0, right and -18 or 18, bottom and 1 or 0, bottom and -18 or 52)
+	local layout = notifyHolder:FindFirstChildOfClass("UIListLayout")
+	if layout then
+		layout.VerticalAlignment = bottom and Enum.VerticalAlignment.Bottom or Enum.VerticalAlignment.Top
+	end
+end
+
+-- Library:SetNotifications({ Side = "Left" | "Right", Anchor = "Top" | "Bottom", Max = 5 })
+function Library:SetNotifications(settings)
+	for key, value in pairs(settings or {}) do
+		self.Notifications[key] = value
+	end
+	placeNotifications()
+end
+
+-- The ScreenGui that holds the window controls. Parent your own overlays here.
+function Library:GetScreenGui()
+	return getGuis().main
+end
+
+-- While `active`, the toggle key and keybinds ignore input (for capturing a key yourself).
+function Library:CaptureKeys(active)
+	self._listening = active == true
+end
 
 function Library:Notify(config)
 	if type(config) == "string" then
@@ -1324,19 +1373,18 @@ function Library:Notify(config)
 	if not notifyHolder then
 		notifyHolder = create("Frame", {
 			Name = "Notifications",
-			AnchorPoint = Vector2.new(1, 1),
-			Position = UDim2.new(1, -18, 1, -18),
-			Size = UDim2.new(0, 300, 1, -36),
+			Size = UDim2.new(0, 300, 1, -70),
 			BackgroundTransparency = 1,
 			Parent = getGuis().main,
 		}, {
 			create("UIListLayout", {
 				SortOrder = Enum.SortOrder.LayoutOrder,
-				VerticalAlignment = Enum.VerticalAlignment.Bottom,
 				Padding = UDim.new(0, 10),
 			}),
 		})
+		placeNotifications()
 	end
+	local offscreen = self.Notifications.Side == "Left" and UDim2.new(0, -320, 0, 0) or UDim2.new(1, 320, 0, 0)
 
 	local wrapper = create("Frame", {
 		Size = UDim2.new(1, 0, 0, 0),
@@ -1344,6 +1392,13 @@ function Library:Notify(config)
 		BackgroundTransparency = 1,
 		Parent = notifyHolder,
 	})
+	table.insert(toasts, wrapper)
+	while #toasts > math.max(1, self.Notifications.Max) do
+		local oldest = table.remove(toasts, 1)
+		if oldest.Parent then
+			oldest:Destroy()
+		end
+	end
 
 	local progress = create("Frame", {
 		AnchorPoint = Vector2.new(0, 1),
@@ -1356,7 +1411,7 @@ function Library:Notify(config)
 
 	-- Colours are read once: a toast is gone before a theme change matters.
 	local card = create("Frame", {
-		Position = UDim2.new(1, 320, 0, 0),
+		Position = offscreen,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundColor3 = theme.Header,
@@ -1416,7 +1471,7 @@ function Library:Notify(config)
 	if self.Support.UIShadow and self.Glow.Enabled then
 		soft("glow", function()
 			local shadow = Instance.new("UIShadow")
-			shadow.Color = glowColor()
+			shadow.Color = glowColor("window")
 			shadow.BlurRadius = UDim.new(0, math.max(4, math.floor(self.Glow.Size * 0.5)))
 			shadow.Transparency = 1 - math.clamp(self.Glow.Strength, 0, 1) * 0.8
 			shadow.Parent = card
@@ -1430,8 +1485,12 @@ function Library:Notify(config)
 		if not wrapper.Parent then
 			return
 		end
-		local out = tween(card, TWEEN_MED, { Position = UDim2.new(1, 320, 0, 0) })
+		local out = tween(card, TWEEN_MED, { Position = offscreen })
 		out.Completed:Connect(function()
+			local at = table.find(toasts, wrapper)
+			if at then
+				table.remove(toasts, at)
+			end
 			wrapper:Destroy()
 		end)
 	end)
@@ -1536,7 +1595,8 @@ local function hoverStroke(button, border, restKey)
 	end)
 end
 
-function Elements:AddLabel(text)
+-- `wrap` lets the text run over several lines instead of being cut off.
+function Elements:AddLabel(text, wrap)
 	local row = makeRow(self, 10)
 	local text_ = label({
 		Size = UDim2.fromScale(1, 1),
@@ -1545,9 +1605,33 @@ function Elements:AddLabel(text)
 		Theme = { TextColor3 = "SubText" },
 		Parent = row,
 	})
-	local option = { Type = "Label", Instance = row }
+	local option = { Type = "Label", Instance = row, TextLabel = text_ }
 	function option:Set(value)
 		text_.Text = tostring(value)
+	end
+	function option:SetWrapped(on)
+		if on then
+			row.AutomaticSize = Enum.AutomaticSize.Y
+			row.Size = UDim2.new(1, 0, 0, 10)
+			text_.AutomaticSize = Enum.AutomaticSize.Y
+			text_.Size = UDim2.new(1, 0, 0, 10)
+			text_.TextWrapped = true
+			text_.TextTruncate = Enum.TextTruncate.None
+			text_.TextYAlignment = Enum.TextYAlignment.Top
+			text_.LineHeight = 1.4
+		else
+			row.AutomaticSize = Enum.AutomaticSize.None
+			row.Size = UDim2.new(1, 0, 0, 10)
+			text_.AutomaticSize = Enum.AutomaticSize.None
+			text_.Size = UDim2.fromScale(1, 1)
+			text_.TextWrapped = false
+			text_.TextTruncate = Enum.TextTruncate.AtEnd
+			text_.TextYAlignment = Enum.TextYAlignment.Center
+			text_.LineHeight = 1
+		end
+	end
+	if wrap then
+		option:SetWrapped(true)
 	end
 	return option
 end
@@ -1767,7 +1851,7 @@ function Elements:AddSlider(config)
 	function option:Set(value, silent)
 		value = math.clamp(round(tonumber(value) or min, step), min, max)
 		self.Value = value
-		valueLabel.Text = tostring(value) .. suffix
+		valueLabel.Text = config.Format and tostring(config.Format(value)) or (tostring(value) .. suffix)
 		local alpha = max > min and (value - min) / (max - min) or 0
 		tween(fill, TWEEN_FAST, { Size = UDim2.fromScale(alpha, 1) })
 		tween(knob, TWEEN_FAST, { Position = UDim2.fromScale(alpha, 0.5) })
@@ -2304,6 +2388,111 @@ function SubTab:AddRightGroupbox(name)
 	return self:AddGroupbox(name, #self._columns)
 end
 
+local Tabbox = {}
+Tabbox.__index = Tabbox
+
+-- A groupbox with a row of small tabs. Each tab (Tabbox:AddTab) is a groupbox body.
+function SubTab:AddTabbox(column)
+	column = math.clamp(math.floor(tonumber(column) or 1), 1, #self._columns)
+	self._counts[column] = (self._counts[column] or 0) + 1
+	local topLine = create("Frame", {
+		LayoutOrder = 1,
+		Size = UDim2.new(1, 0, 0, 2),
+		Theme = { BackgroundColor3 = "Accent" },
+	})
+	setGlowOn(addGlow(topLine, "element"), true)
+	local row = create("Frame", {
+		LayoutOrder = 2,
+		Size = UDim2.new(1, 0, 0, 22),
+		BackgroundTransparency = 1,
+	}, {
+		create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+	})
+	local rule = create("Frame", {
+		LayoutOrder = 3,
+		Size = UDim2.new(1, 0, 0, 1),
+		Theme = { BackgroundColor3 = "Stroke" },
+	})
+	local frame = create("Frame", {
+		LayoutOrder = self._counts[column],
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Theme = { BackgroundColor3 = "Panel" },
+		Parent = self._columns[column],
+	}, {
+		stroke(),
+		create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }),
+		topLine,
+		row,
+		rule,
+	})
+	glass(frame, "panel")
+	return setmetatable({ Instance = frame, _row = row, _tabs = {} }, Tabbox)
+end
+
+function SubTab:AddLeftTabbox()
+	return self:AddTabbox(1)
+end
+
+function SubTab:AddRightTabbox()
+	return self:AddTabbox(#self._columns)
+end
+
+function Tabbox:AddTab(name)
+	local tabbox = self
+	local body = create("Frame", {
+		LayoutOrder = 4,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		Visible = false,
+		Parent = self.Instance,
+	}, {
+		padding(8, 10, 11, 10),
+		create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }),
+	})
+	local underline = create("Frame", {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, 1),
+		Visible = false,
+		Theme = { BackgroundColor3 = "Accent" },
+	})
+	local button = create("TextButton", {
+		LayoutOrder = #self._tabs + 1,
+		Size = UDim2.new(0, 0, 1, 0),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundTransparency = 1,
+		Font = FONT,
+		TextSize = TEXT,
+		Text = name or "tab",
+		AutoButtonColor = false,
+		Parent = self._row,
+	}, { padding(0, 10), underline })
+	local entry = { button = button, body = body, underline = underline, active = false }
+	table.insert(self._tabs, entry)
+	local function choose()
+		for _, other in ipairs(tabbox._tabs) do
+			local on = other == entry
+			other.active = on
+			other.body.Visible = on
+			other.underline.Visible = on
+			other.button.TextColor3 = on and Library.Theme.Accent or Library.Theme.SubText
+		end
+	end
+	button.MouseButton1Click:Connect(choose)
+	onTheme(function(theme)
+		button.TextColor3 = entry.active and theme.Accent or theme.SubText
+	end)
+	if #self._tabs == 1 then
+		choose()
+	end
+	return setmetatable({ Container = body, Instance = body, _order = 0 }, Groupbox)
+end
+
 -- `config` may be a name or { Name, Columns }.
 function Tab:AddSubTab(config)
 	if type(config) == "string" then
@@ -2411,6 +2600,39 @@ function Tab:AddRightGroupbox(name)
 	return defaultSubTab(self):AddRightGroupbox(name)
 end
 
+function Tab:AddTabbox(column)
+	return defaultSubTab(self):AddTabbox(column)
+end
+
+function Tab:AddLeftTabbox()
+	return defaultSubTab(self):AddLeftTabbox()
+end
+
+function Tab:AddRightTabbox()
+	return defaultSubTab(self):AddRightTabbox()
+end
+
+-- Runs `builder(tab)` the first time the tab is shown (at once if it already is), so
+-- big tabs only cost anything when somebody opens them.
+function Tab:SetBuilder(builder)
+	self._builder = builder
+	if self._active then
+		self:_build()
+	end
+end
+
+function Tab:_build()
+	local builder = self._builder
+	if not builder then
+		return
+	end
+	self._builder = nil
+	local ok, err = pcall(builder, self)
+	if not ok then
+		warn("[Sakura UI] tab builder failed: " .. tostring(err))
+	end
+end
+
 ---------------------------------------------------------------------
 -- Window
 ---------------------------------------------------------------------
@@ -2477,6 +2699,7 @@ function Library:CreateWindow(config)
 		function scene:Recolor() end
 	end
 	window._scene = scene
+	window.Backdrop = sceneClip -- clipped frame behind the controls (custom images go here)
 	window._scene.Instance.Visible = config.Background ~= false
 
 	-- Layer 3: the controls.
@@ -2490,6 +2713,7 @@ function Library:CreateWindow(config)
 		Active = true, -- stop clicks falling through to the game
 		Parent = shell,
 	})
+	window._content = content
 	-- A visible modal button frees the mouse in first-person games.
 	create("TextButton", {
 		Size = UDim2.new(),
@@ -2499,16 +2723,29 @@ function Library:CreateWindow(config)
 		Parent = shell,
 	})
 
-	-- Shrink to fit small (phone) screens.
+	-- Scale: whatever SetScale asks for, shrunk so the window fits the screen.
+	window._userScale = 1
+	window._scales = {}
+	for _, frame in ipairs(window._roots) do
+		table.insert(window._scales, create("UIScale", { Scale = 1, Parent = frame }))
+	end
 	local camera = workspace and workspace.CurrentCamera
-	if camera and size.X.Offset > 0 and size.Y.Offset > 0 then
-		local viewport = camera.ViewportSize
-		local scale = math.min(1, (viewport.X - 24) / size.X.Offset, (viewport.Y - 24) / size.Y.Offset)
-		if scale < 1 then
-			for _, frame in ipairs(window._roots) do
-				create("UIScale", { Scale = math.max(scale, 0.4), Parent = frame })
-			end
+	function window:_rescale()
+		local fit = 2
+		if camera and size.X.Offset > 0 and size.Y.Offset > 0 then
+			local viewport = camera.ViewportSize
+			fit = math.min((viewport.X - 24) / size.X.Offset, (viewport.Y - 24) / size.Y.Offset)
 		end
+		local value = math.clamp(math.min(self._userScale, fit), 0.4, 2)
+		for _, scale in ipairs(self._scales) do
+			scale.Scale = value
+		end
+	end
+	window:_rescale()
+	if camera then
+		connect(camera:GetPropertyChangedSignal("ViewportSize"), function()
+			window:_rescale()
+		end)
 	end
 
 	local petalLayer = create("Frame", {
@@ -2743,6 +2980,12 @@ function Library:CreateWindow(config)
 	return window
 end
 
+-- Window scale in percent (40-200). It still shrinks to fit the screen.
+function Window:SetScale(percent)
+	self._userScale = math.clamp((tonumber(percent) or 100) / 100, 0.4, 2)
+	self:_rescale()
+end
+
 function Window:SetVisible(visible)
 	self.Visible = visible
 	for _, frame in ipairs(self._roots) do
@@ -2795,6 +3038,9 @@ function Window:SelectTab(tab, instant)
 			BackgroundTransparency = active and 0.35 or 1,
 			TextColor3 = active and Library.Theme.Text or Library.Theme.SubText,
 		})
+	end
+	if tab and tab._builder then
+		tab:_build()
 	end
 end
 
@@ -2870,6 +3116,64 @@ function Window:AddTab(config)
 		self:SelectTab(tab, true)
 	end
 	return tab
+end
+
+-- Docks a panel along the right edge, beside the tab pages (the tabs and sub-tabs
+-- narrow to make room). Fill the returned `Container` with whatever you like.
+-- config: { Title, Width }
+function Window:AddSidePanel(config)
+	config = config or {}
+	if self._side then
+		return self._side
+	end
+	local width = math.clamp(math.floor(tonumber(config.Width) or 260), 160, 480)
+	local top = TITLE_HEIGHT + TAB_HEIGHT
+	self._subBar.Size = UDim2.new(1, -width, 0, SUB_HEIGHT)
+	self._pages.Size = UDim2.new(1, -width, 1, -(top + SUB_HEIGHT) - STATUS_HEIGHT)
+
+	local icon = sprite(SPRITES.bloomShaded, 2, BLOOM_ROSE)
+	icon.AnchorPoint = Vector2.new(0, 0.5)
+	icon.Position = UDim2.new(0, 8, 0.5, 0)
+	local topLine = create("Frame", {
+		Size = UDim2.new(1, 0, 0, 2),
+		Theme = { BackgroundColor3 = "Accent" },
+	})
+	setGlowOn(addGlow(topLine, "element"), true)
+	local body = create("Frame", {
+		Position = UDim2.fromOffset(0, 28),
+		Size = UDim2.new(1, 0, 1, -28),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+	})
+	local frame = create("Frame", {
+		Name = "SidePanel",
+		Position = UDim2.new(1, -width, 0, top),
+		Size = UDim2.new(0, width, 1, -top - STATUS_HEIGHT),
+		ZIndex = 2,
+		Theme = { BackgroundColor3 = "Panel" },
+		Parent = self._content,
+	}, {
+		stroke(),
+		topLine,
+		create("Frame", {
+			Position = UDim2.fromOffset(0, 2),
+			Size = UDim2.new(1, 0, 0, 26),
+			BackgroundTransparency = 1,
+		}, {
+			icon,
+			label({
+				Position = UDim2.fromOffset(30, 0),
+				Size = UDim2.new(1, -40, 1, 0),
+				Text = config.Title or "panel",
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				Theme = { TextColor3 = "Accent" },
+			}),
+		}),
+		body,
+	})
+	glass(frame, "panel")
+	self._side = { Container = body, Instance = frame, Width = width }
+	return self._side
 end
 
 -- Adds a ready-made settings tab: look (theme, glow, glass, petals),
@@ -2995,6 +3299,17 @@ function Window:AddSettingsTab(name)
 		Flag = "Sakura.GlowStrength",
 		Callback = function(value)
 			Library:SetGlow({ Strength = value / 100 })
+		end,
+	})
+	glowBox:AddSlider({
+		Name = "control glow",
+		Min = 0,
+		Max = 100,
+		Default = math.floor(Library.Glow.ElementStrength * 100 + 0.5),
+		Suffix = "%",
+		Flag = "Sakura.GlowControls",
+		Callback = function(value)
+			Library:SetGlow({ ElementStrength = value / 100 })
 		end,
 	})
 	glowBox:AddToggle({
@@ -3213,6 +3528,7 @@ function Library:Unload()
 		self._guis[key] = nil
 	end
 	notifyHolder = nil
+	toasts = {}
 	watermark = nil
 	safeCall(self.OnUnload)
 end
@@ -3377,6 +3693,15 @@ Lighting:AddSlider({
 		game:GetService("Lighting").ClockTime = value
 	end,
 })
+
+-- A tabbox: one groupbox with its own little tabs
+local Extras = World:AddRightTabbox()
+local Fog = Extras:AddTab("fog")
+Fog:AddToggle({ Name = "no fog", Flag = "NoFog", Callback = print })
+Fog:AddSlider({ Name = "fog distance", Min = 100, Max = 5000, Increment = 50, Default = 1500, Flag = "FogDistance" })
+local Sky = Extras:AddTab("sky")
+Sky:AddToggle({ Name = "always day", Flag = "AlwaysDay" })
+Sky:AddColorPicker({ Name = "sky tint", Default = Color3.fromRGB(255, 190, 220), Flag = "SkyTint" })
 
 -- Visuals tab: three columns -------------------------------------------
 local Visuals = Window:AddTab("visuals")

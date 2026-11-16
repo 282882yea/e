@@ -54,6 +54,8 @@ Window:AddSettingsTab() -- theme, accent, glow, glass, petals, configs, toggle k
 
 ## Elements
 
+`AddSlider` also takes `Format = function(value) return text end` to replace the value display.
+
 Every groupbox has the same methods as Nova UI (see [README.md](README.md)): `AddButton`, `AddToggle`, `AddSlider`, `AddDropdown`, `AddTextbox`, `AddKeybind`, `AddColorPicker`, `AddLabel`, `AddParagraph`, `AddDivider`. Each returns an object with `.Value`, `:Set(value, silent)` and `:OnChanged(fn)`; flags are in `Sakura.Flags` and `Sakura.Options`.
 
 ## Glow (UIShadow)
