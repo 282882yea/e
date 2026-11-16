@@ -4,8 +4,8 @@ local function makeFrekksecSettings(helper, ui, private, window, store, d)
     local defaults = {MenuKey="Insert",Opacity=72,Scale=100,Blur=false,Glow=60,HoverGlow=true,WindowGlow=35,WindowGlowWidth=24,
         Watermark=true,Keybinds=false,KeybindMode="Always",Notifications=true,LoadNotification=true,
         NotifySide="Left",NotifyDuration=4,BackgroundImage="",BackgroundOpacity=15,
-        Scene="Dusk",Backdrop=true,Petals=true,PetalCount=16,PanelBlur="Medium",GlowPulse=true,LogoGlow=85}
-    local limits = {Opacity={15,100},Scale={60,120},Glow={0,100},WindowGlow={0,100},WindowGlowWidth={8,48},NotifyDuration={1,10},BackgroundOpacity={0,100},PetalCount={0,60},LogoGlow={0,100}}
+        Scene="Dusk",Backdrop=true,Petals=true,PetalCount=16,PanelBlur="Medium",GlowPulse=true,LogoGlow=85,WindowWidth=1010,WindowHeight=590}
+    local limits = {Opacity={15,100},Scale={60,120},Glow={0,100},WindowGlow={0,100},WindowGlowWidth={8,48},NotifyDuration={1,10},BackgroundOpacity={0,100},PetalCount={0,60},LogoGlow={0,100},WindowWidth={640,4000},WindowHeight={400,3000}}
     local P = table.clone(defaults)
     for key, fallback in pairs(defaults) do
         local value = saved[key]
@@ -219,6 +219,16 @@ local function makeFrekksecSettings(helper, ui, private, window, store, d)
     control(sakura,"PanelBlur","Panel blur",{"Off","Light","Medium","Heavy"})
     control(sakura,"GlowPulse","Glow pulse")
     control(sakura,"LogoGlow","Logo glow (%)")
+    -- Window size: drag the bottom-right corner; it is remembered.
+    if ui.Window then
+        ui.Window:SetSize(P.WindowWidth,P.WindowHeight)
+        ui.Window.OnResized=function(w,h) P.WindowWidth,P.WindowHeight=w,h;persist() end
+    end
+    sakura:AddButton("Reset window size",function()
+        P.WindowWidth,P.WindowHeight=1010,590
+        if ui.Window then ui.Window:SetSize(1010,590) end
+        persist()
+    end)
 
     local config=data:AddLeftGroupbox("Configuration")
     config:AddInput("frekksec_config_name",{Text="Config name",Default="",Finished=true})

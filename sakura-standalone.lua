@@ -1108,7 +1108,7 @@ local function frostImage(window)
 	local scene = Library.Theme.Scene
 	local set = type(scene) == "string" and frost.Images[scene]
 	local image = set and set[level]
-	if not image or window._frostSize.X ~= frost.Width or window._frostSize.Y ~= frost.Height then
+	if not image then
 		return nil
 	end
 	return image
@@ -1117,11 +1117,13 @@ end
 -- Crop of the frost image under a panel: rect (absolute) -> content pixels.
 -- Returns position, size (content pixels) and rect offset, size (image pixels),
 -- or nil when nothing of the panel is visible.
-function Library._frostCrop(contentPos, scale, x0, y0, x1, y1)
+-- W, H: the window's content size (the image is stretched over it when a resized
+-- window no longer matches the size it was baked at).
+function Library._frostCrop(contentPos, scale, x0, y0, x1, y1, W, H)
 	if scale <= 0 then
 		return nil
 	end
-	local W, H = frost.Width, frost.Height
+	W, H = W or frost.Width, H or frost.Height
 	local lx0 = math.max(0, (x0 - contentPos.X) / scale)
 	local ly0 = math.max(0, (y0 - contentPos.Y) / scale)
 	local lx1 = math.min(W, (x1 - contentPos.X) / scale)
@@ -1184,7 +1186,7 @@ local function updateFrost(window)
 				end
 				local at, extent, offset, rect
 				if shown then
-					at, extent, offset, rect = Library._frostCrop(cp, scale, x0, y0, x1, y1)
+					at, extent, offset, rect = Library._frostCrop(cp, scale, x0, y0, x1, y1, window._frostSize.X, window._frostSize.Y)
 				end
 				if not entry.copy then
 					entry.copy = create("ImageLabel", {
@@ -1410,6 +1412,9 @@ end
 -- Petals drifting across `layer`, snapped to the art-pixel grid.
 local function startPetals(window, layer, width, height, pixel)
 	local petals = { _items = {} }
+	function petals:SetBounds(w, h)
+		width, height = w, h
+	end
 	local shapes = { { 2, 1 }, { 1, 1 }, { 2, 2 }, { 1, 2 } }
 	local slots = { "roseLight", "roseHi", "whiteLight", "whiteHi", "roseMid" }
 	local clock = 0
@@ -2949,9 +2954,10 @@ function Library:CreateWindow(config)
 	local camera = workspace and workspace.CurrentCamera
 	function window:_rescale()
 		local fit = 2
-		if camera and size.X.Offset > 0 and size.Y.Offset > 0 then
+		local current = self._size
+		if camera and current.X.Offset > 0 and current.Y.Offset > 0 then
 			local viewport = camera.ViewportSize
-			fit = math.min((viewport.X - 24) / size.X.Offset, (viewport.Y - 24) / size.Y.Offset)
+			fit = math.min((viewport.X - 24) / current.X.Offset, (viewport.Y - 24) / current.Y.Offset)
 		end
 		local value = math.clamp(math.min(self._userScale, fit), 0.4, 2)
 		for _, scale in ipairs(self._scales) do
@@ -3073,6 +3079,60 @@ function Library:CreateWindow(config)
 		end)
 	end)
 
+	-- Resizing: drag the grip in the bottom-right corner -------------
+	window.MinSize = config.MinSize or Vector2.new(640, 400)
+	if config.Resizable ~= false and size.X.Scale == 0 and size.Y.Scale == 0 then
+		local grip = create("TextButton", {
+			Name = "ResizeGrip",
+			AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, -1, 1, -1),
+			Size = UDim2.fromOffset(16, 16),
+			BackgroundTransparency = 1,
+			Text = "",
+			AutoButtonColor = false,
+			ZIndex = 20,
+			Parent = shell,
+		})
+		-- a little pixel staircase
+		local dots = {}
+		for i, spot in ipairs({ { 12, 4 }, { 8, 8 }, { 12, 8 }, { 4, 12 }, { 8, 12 }, { 12, 12 } }) do
+			dots[i] = create("Frame", {
+				Position = UDim2.fromOffset(spot[1] - 2, spot[2] - 2),
+				Size = UDim2.fromOffset(2, 2),
+				BackgroundTransparency = 0.35,
+				Theme = { BackgroundColor3 = "Accent" },
+				Parent = grip,
+			})
+		end
+		grip.MouseEnter:Connect(function()
+			for _, dot in ipairs(dots) do
+				dot.BackgroundTransparency = 0
+			end
+		end)
+		grip.MouseLeave:Connect(function()
+			for _, dot in ipairs(dots) do
+				dot.BackgroundTransparency = 0.35
+			end
+		end)
+		grip.InputBegan:Connect(function(input)
+			if not isPress(input) or window.Minimized then
+				return
+			end
+			local origin = input.Position
+			local startSize = window._size
+			local scale = window._scales[1] and window._scales[1].Scale or 1
+			trackDrag(input, function(position)
+				local delta = position - origin
+				window:SetSize(startSize.X.Offset + delta.X / scale, startSize.Y.Offset + delta.Y / scale)
+			end, function()
+				if window.OnResized then
+					task.spawn(window.OnResized, window._size.X.Offset, window._size.Y.Offset)
+				end
+			end)
+		end)
+		window._grip = grip
+	end
+
 	-- Tab bar, sub-tab bar and pages ---------------------------------
 	local tabBar = create("Frame", {
 		Position = UDim2.fromOffset(0, TITLE_HEIGHT),
@@ -3160,7 +3220,7 @@ function Library:CreateWindow(config)
 	})
 	window._hint = label({
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -8, 0, 0),
+		Position = UDim2.new(1, -22, 0, 0),
 		Size = UDim2.new(0.4, -8, 1, 0),
 		TextXAlignment = Enum.TextXAlignment.Right,
 		Theme = { TextColor3 = "SubText" },
@@ -3255,6 +3315,42 @@ function Window:SetMinimized(minimized)
 	for _, frame in ipairs(self._roots) do
 		tween(frame, TWEEN_MED, { Size = target })
 	end
+end
+
+-- Resizes the window (pixels, before UI scale), keeping its top-left corner in place.
+function Window:SetSize(width, height)
+	local min = self.MinSize or Vector2.new(640, 400)
+	local maxW, maxH = 4000, 3000
+	local camera = workspace and workspace.CurrentCamera
+	local scale = self._scales[1] and self._scales[1].Scale or 1
+	if camera and scale > 0 then
+		maxW = math.max(min.X, (camera.ViewportSize.X - 8) / scale)
+		maxH = math.max(min.Y, (camera.ViewportSize.Y - 8) / scale)
+	end
+	width = math.floor(math.clamp(tonumber(width) or min.X, min.X, maxW) + 0.5)
+	height = math.floor(math.clamp(tonumber(height) or min.Y, min.Y, maxH) + 0.5)
+	local old = self._size
+	local dw, dh = width - old.X.Offset, height - old.Y.Offset
+	if dw == 0 and dh == 0 then
+		return
+	end
+	self._size = UDim2.fromOffset(width, height)
+	for _, frame in ipairs(self._roots) do
+		local pos = frame.Position
+		-- roots are centre-anchored: shift by half the growth to keep the corner put
+		frame.Position = UDim2.new(pos.X.Scale, pos.X.Offset + dw * scale / 2, pos.Y.Scale, pos.Y.Offset + dh * scale / 2)
+		if not self.Minimized then
+			frame.Size = self._size
+		end
+	end
+	self._frostSize = Vector2.new(width - BORDER * 2, height - BORDER * 2)
+	if self._petals and self._petals.SetBounds then
+		self._petals:SetBounds(width - BORDER * 2, height - BORDER * 2)
+	end
+end
+
+function Window:GetSize()
+	return self._size.X.Offset, self._size.Y.Offset
 end
 
 -- Shows or hides the pixel-art backdrop (a plain panel colour is left behind).

@@ -128,6 +128,8 @@ Theme keys: `Scene` (`"Dusk"`, `"Night"`, `"Day"`), `Outline`, `Accent`, `Panel`
 
 ```lua
 Window:Toggle()  Window:SetVisible(false)  Window:SetMinimized(true)
+Window:SetSize(1100, 640)  Window:GetSize()       -- drag the bottom-right corner too
+Window.OnResized = function(w, h) end              -- after a corner drag; MinSize / Resizable = false in CreateWindow
 Window:SetToggleKey("F4")  Window:SelectTab(tab)  tab:SelectSubTab(sub)
 
 Sakura:SaveConfig("default", "SakuraHub")
