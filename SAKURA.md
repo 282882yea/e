@@ -80,6 +80,38 @@ Sakura:SetGlass({ Blur = "Medium", Transparency = 0.28 }) -- Off, Light, Medium,
 
 `Sakura.Support.UIShadow` / `Sakura.Support.UIBlur` tell you what the client supports.
 
+### Frost (baked blur)
+
+UIBlur does not blur what is behind a panel on most clients. Frost fixes that with
+pre-blurred images of the backdrop: each glass panel gets the matching crop of the
+image drawn under it every frame, so it follows scrolling, tabs and window scale.
+
+```lua
+Sakura:SetFrost({
+	Width = 1006, Height = 586,           -- window content size the images were baked at
+	ImageWidth = 252, ImageHeight = 147,  -- pixel size of the images
+	Images = { Dusk = { Light = id, Medium = id, Heavy = id }, Night = {...}, Day = {...} },
+	Enabled = true,
+})
+```
+
+Frost is used only when the window is exactly `Width + 4` x `Height + 4`, the backdrop is
+shown and `Glass.Blur` is not `"Off"`; otherwise panels fall back to the plain tint.
+`frekksec-sakura.lua` ships ready-made images in `frekksec/assets/`.
+
+## Logo
+
+An image title whose glow is a separate white layer tinted at runtime:
+
+```lua
+Sakura:SetLogo({ Image = textId, Glow = glowId, Width = 448, Height = 110 })
+local Window = Sakura:CreateWindow({ Logo = true })    -- logo instead of the title text
+local frame = Sakura:CreateLogo(22, someParent)        -- the logo anywhere else
+Sakura:SetGlow({ LogoColor = Color3.fromRGB(90, 220, 255), LogoStrength = 0.85 })
+```
+
+`LogoColor = false` follows `SurfaceColor`, then the accent.
+
 ## Look
 
 ```lua

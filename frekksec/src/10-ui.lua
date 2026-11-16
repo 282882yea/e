@@ -14,6 +14,7 @@ local function loadFrekksecUI(private)
         FontColor = Color3.fromRGB(255, 236, 245),
         SurfaceGlowColor = Color3.fromRGB(255, 126, 182),
         ControlGlowColor = Color3.fromRGB(255, 126, 182),
+        LogoGlowColor = Color3.fromRGB(180, 124, 255),
         Scene = "Dusk",
         Library = Sakura,
         _connections = {},
@@ -108,7 +109,7 @@ local function loadFrekksecUI(private)
             SubText = self.SubColor,
             Knob = self.Bright and accent:Lerp(black, 0.35) or Color3.new(1, 1, 1),
         })
-        Sakura:SetGlow({SurfaceColor = self.SurfaceGlowColor, ControlColor = self.ControlGlowColor})
+        Sakura:SetGlow({SurfaceColor = self.SurfaceGlowColor, ControlColor = self.ControlGlowColor, LogoColor = self.LogoGlowColor})
         for object, properties in pairs(self.Registry) do
             if object.Parent then
                 for property, key in pairs(properties) do object[property] = self[key] end
@@ -126,6 +127,9 @@ local function loadFrekksecUI(private)
         Sakura:SetGlow({Strength = strength, Size = width})
         self:_paintShadows()
     end
+    function ui:SetLogoGlow(percent) Sakura:SetGlow({LogoStrength = math.clamp((tonumber(percent) or 85) / 100, 0, 1)}) end
+    -- Frost (baked blur) is skipped while a custom background image covers the scene.
+    function ui:SetFrost(on) Sakura:SetFrost({Enabled = on ~= false}) end
     function ui:SetGlowPulse(on) Sakura:SetGlow({Pulse = on == true}) end
     function ui:SetScene(name)
         if self.Scene ~= name then self.Scene = name; self:UpdateColorsUsingRegistry() end
@@ -502,8 +506,16 @@ local function loadFrekksecUI(private)
     end
 
     function ui:CreateWindow(title)
+        local assets = {}
+        pcall(function() assets = loadFrekksecAssets() end)
+        self.Assets = assets
+        if assets.Frost then
+            Sakura:SetFrost(assets.Frost)
+            assets:FetchFrost()
+        end
         local window = Sakura:CreateWindow({
             Title = title,
+            Logo = assets.Logo,
             Size = UDim2.fromOffset(1010, 590),
             ToggleKey = Enum.KeyCode.Insert,
             Footer = "frekksec lua  |  F6 helper  |  X fake position  |  End panic",

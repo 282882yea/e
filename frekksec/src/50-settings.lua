@@ -4,8 +4,8 @@ local function makeFrekksecSettings(helper, ui, private, window, store, d)
     local defaults = {MenuKey="Insert",Opacity=72,Scale=100,Blur=false,Glow=60,HoverGlow=true,WindowGlow=35,WindowGlowWidth=24,
         Watermark=true,Keybinds=false,KeybindMode="Always",Notifications=true,LoadNotification=true,
         NotifySide="Left",NotifyDuration=4,BackgroundImage="",BackgroundOpacity=15,
-        Scene="Dusk",Backdrop=true,Petals=true,PetalCount=16,PanelBlur="Medium",GlowPulse=true}
-    local limits = {Opacity={15,100},Scale={60,120},Glow={0,100},WindowGlow={0,100},WindowGlowWidth={8,48},NotifyDuration={1,10},BackgroundOpacity={0,100},PetalCount={0,60}}
+        Scene="Dusk",Backdrop=true,Petals=true,PetalCount=16,PanelBlur="Medium",GlowPulse=true,LogoGlow=85}
+    local limits = {Opacity={15,100},Scale={60,120},Glow={0,100},WindowGlow={0,100},WindowGlowWidth={8,48},NotifyDuration={1,10},BackgroundOpacity={0,100},PetalCount={0,60},LogoGlow={0,100}}
     local P = table.clone(defaults)
     for key, fallback in pairs(defaults) do
         local value = saved[key]
@@ -33,7 +33,7 @@ local function makeFrekksecSettings(helper, ui, private, window, store, d)
     if not table.find({"Off","Light","Medium","Heavy"},P.PanelBlur) then P.PanelBlur=defaults.PanelBlur end
     if P.BackgroundImage ~= "" and not P.BackgroundImage:match("^%d+$") then P.BackgroundImage="" end
     S.Prefs=P
-    local themeKeys={"MainColor","AccentColor","BackgroundColor","OutlineColor","FontColor","SurfaceGlowColor","ControlGlowColor"}
+    local themeKeys={"MainColor","AccentColor","BackgroundColor","OutlineColor","FontColor","SurfaceGlowColor","ControlGlowColor","LogoGlowColor"}
     local builtins={
         ["Sakura Dusk"]={MainColor={54,30,72},AccentColor={255,126,182},BackgroundColor={35,19,48},OutlineColor={104,66,128},FontColor={255,236,245}},
         ["Sakura Night"]={MainColor={30,25,66},AccentColor={255,95,162},BackgroundColor={17,14,42},OutlineColor={66,56,120},FontColor={241,234,255}},
@@ -120,6 +120,8 @@ local function makeFrekksecSettings(helper, ui, private, window, store, d)
         ui:SetPetals(P.Petals,P.PetalCount)
         ui:SetPanelBlur(P.PanelBlur)
         ui:SetGlowPulse(P.GlowPulse)
+        ui:SetLogoGlow(P.LogoGlow)
+        ui:SetFrost(P.BackgroundImage=="")
         background.Image=P.BackgroundImage~="" and "rbxassetid://"..P.BackgroundImage or ""
         background.ImageTransparency=1-P.BackgroundOpacity/100
         background.Visible=P.BackgroundImage~=""
@@ -214,8 +216,9 @@ local function makeFrekksecSettings(helper, ui, private, window, store, d)
     control(sakura,"Backdrop","Pixel backdrop")
     control(sakura,"Petals","Falling petals")
     control(sakura,"PetalCount","Petal amount")
-    control(sakura,"PanelBlur","Panel blur (UIBlur)",{"Off","Light","Medium","Heavy"})
+    control(sakura,"PanelBlur","Panel blur",{"Off","Light","Medium","Heavy"})
     control(sakura,"GlowPulse","Glow pulse")
+    control(sakura,"LogoGlow","Logo glow (%)")
 
     local config=data:AddLeftGroupbox("Configuration")
     config:AddInput("frekksec_config_name",{Text="Config name",Default="",Finished=true})
@@ -308,7 +311,7 @@ local function makeFrekksecSettings(helper, ui, private, window, store, d)
     local themeTabs=themesPage:AddLeftTabbox("Theme settings")
     local themes=themeTabs:AddTab("Themes")
     local backdrop=themeTabs:AddTab("Background")
-    local names={SurfaceGlowColor="Window / HUD glow",ControlGlowColor="Button / control glow"}
+    local names={SurfaceGlowColor="Window / HUD glow",ControlGlowColor="Button / control glow",LogoGlowColor="Logo glow"}
     for _,key in ipairs(themeKeys) do
         themes:AddLabel(names[key] or key:gsub("Color$"," color")):AddColorPicker("frekksec_color_"..key,{Default=Color3.fromRGB(table.unpack(P.Colors[key]))})
         local picker=private.Options["frekksec_color_"..key]

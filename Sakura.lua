@@ -898,7 +898,9 @@ local glows = {}
 local function glowColor(kind)
 	local settings = Library.Glow
 	local specific
-	if kind == "window" or kind == "image" then
+	if kind == "logo" then
+		specific = settings.LogoColor or settings.SurfaceColor
+	elseif kind == "window" or kind == "image" then
 		specific = settings.SurfaceColor
 	else
 		specific = settings.ControlColor
@@ -908,6 +910,16 @@ end
 
 local function writeGlow(entry, pulse)
 	local settings = Library.Glow
+	if entry.kind == "logo" then
+		-- A logo's glow is a white image tinted at runtime; it ignores Enabled.
+		local color = glowColor("logo")
+		local strength = math.clamp(settings.LogoStrength or 0.85, 0, 1) * (pulse or 1)
+		entry.glow.ImageColor3 = color
+		entry.glow.ImageTransparency = 1 - strength
+		entry.bloom.ImageColor3 = color
+		entry.bloom.ImageTransparency = 1 - strength * 0.4
+		return
+	end
 	local strength = math.clamp(settings.Strength, 0, 1)
 	local size = math.max(0, settings.Size)
 	local shadow = entry.shadow
@@ -997,7 +1009,7 @@ end
 -- accent again. SurfaceColor tints the window glow, ControlColor the small glows.
 function Library:SetGlow(settings)
 	for key, value in pairs(settings or {}) do
-		if (key == "Color" or key == "SurfaceColor" or key == "ControlColor") and value == false then
+		if (key == "Color" or key == "SurfaceColor" or key == "ControlColor" or key == "LogoColor") and value == false then
 			self.Glow[key] = nil
 		else
 			self.Glow[key] = value
@@ -1013,6 +1025,7 @@ end
 ---------------------------------------------------------------------
 
 local glasses = {}
+local frost = { Enabled = true } -- see Library:SetFrost
 
 local function applyGlass(entry)
 	local settings = Library.Glass
@@ -1023,7 +1036,7 @@ local function applyGlass(entry)
 	entry.frame.BackgroundTransparency = transparency
 	local blur = entry.blur
 	if blur then
-		local on = settings.Blur ~= "Off"
+		local on = settings.Blur ~= "Off" and not frost.Images
 		soft("blur", function()
 			blur.Enabled = on
 		end)
@@ -1038,7 +1051,8 @@ end
 -- Makes `frame` a frosted panel: a tinted, see-through background with a
 -- UIBlur behind it where the client supports one.
 local function glass(frame, kind)
-	local entry = { frame = frame, kind = kind or "panel" }
+	local entry = { frame = frame, kind = kind or "panel", notIn = {} }
+	pcall(frame.SetAttribute, frame, "SakuraGlass", entry.kind)
 	if Library.Support.UIBlur then
 		soft("blur", function()
 			local blur = Instance.new("UIBlur")
@@ -1049,6 +1063,209 @@ local function glass(frame, kind)
 	table.insert(glasses, entry)
 	applyGlass(entry)
 	return entry
+end
+
+---------------------------------------------------------------------
+-- Frost: baked blur. UIBlur does not blur what is behind a panel on most
+-- clients, so Library:SetFrost takes pre-blurred images of each backdrop
+-- scene, and every frame each glass panel gets the matching crop drawn
+-- right under it. The panel's own tint then sits on top as usual.
+--
+-- Library:SetFrost({
+--     Width = 1006, Height = 586,          -- content size the images were baked at
+--     ImageWidth = 252, ImageHeight = 147, -- pixel size of the images
+--     Images = { Dusk = { Light = "rbxasset...", Medium = ..., Heavy = ... }, ... },
+--     Enabled = true,
+-- })
+-- Frost is used only when the window's content size matches Width x Height,
+-- the backdrop is shown and Glass.Blur is not "Off"; otherwise the tint is used.
+---------------------------------------------------------------------
+
+Library.Frost = frost
+
+function Library:SetFrost(settings)
+	for key, value in pairs(settings or {}) do
+		frost[key] = value
+	end
+	for _, entry in ipairs(glasses) do
+		applyGlass(entry)
+	end
+end
+
+local function frostImage(window)
+	if not (frost.Enabled and frost.Images and window._frostSize and window._frostLayer) then
+		return nil
+	end
+	if not window._scene.Instance.Visible then
+		return nil
+	end
+	local level = Library.Glass.Blur
+	if level == "Off" then
+		return nil
+	end
+	local scene = Library.Theme.Scene
+	local set = type(scene) == "string" and frost.Images[scene]
+	local image = set and set[level]
+	if not image or window._frostSize.X ~= frost.Width or window._frostSize.Y ~= frost.Height then
+		return nil
+	end
+	return image
+end
+
+-- Crop of the frost image under a panel: rect (absolute) -> content pixels.
+-- Returns position, size (content pixels) and rect offset, size (image pixels),
+-- or nil when nothing of the panel is visible.
+function Library._frostCrop(contentPos, scale, x0, y0, x1, y1)
+	if scale <= 0 then
+		return nil
+	end
+	local W, H = frost.Width, frost.Height
+	local lx0 = math.max(0, (x0 - contentPos.X) / scale)
+	local ly0 = math.max(0, (y0 - contentPos.Y) / scale)
+	local lx1 = math.min(W, (x1 - contentPos.X) / scale)
+	local ly1 = math.min(H, (y1 - contentPos.Y) / scale)
+	if lx1 - lx0 < 1 or ly1 - ly0 < 1 then
+		return nil
+	end
+	local kx, ky = frost.ImageWidth / W, frost.ImageHeight / H
+	return Vector2.new(lx0, ly0), Vector2.new(lx1 - lx0, ly1 - ly0),
+		Vector2.new(lx0 * kx, ly0 * ky), Vector2.new((lx1 - lx0) * kx, (ly1 - ly0) * ky)
+end
+
+local function updateFrost(window)
+	local image = frostImage(window)
+	local layer = window._frostLayer
+	if not layer then
+		return
+	end
+	layer.Visible = image ~= nil
+	if not image then
+		return
+	end
+	local content = window._content
+	local scale = window._scales[1] and window._scales[1].Scale or 1
+	local cp = content.AbsolutePosition
+	for i = #glasses, 1, -1 do
+		local entry = glasses[i]
+		local frame = entry.frame
+		if not frame.Parent then
+			if entry.copy then
+				entry.copy:Destroy()
+			end
+			table.remove(glasses, i)
+		elseif not entry.notIn[window] then
+			if entry.window ~= window then
+				if frame:IsDescendantOf(content) then
+					entry.window = window
+				else
+					entry.notIn[window] = true
+				end
+			end
+			if entry.window == window then
+				local pos, size = frame.AbsolutePosition, frame.AbsoluteSize
+				local x0, y0, x1, y1 = pos.X, pos.Y, pos.X + size.X, pos.Y + size.Y
+				local shown = true
+				local node = frame
+				while node and node ~= content do
+					if node:IsA("GuiObject") then
+						if not node.Visible then
+							shown = false
+							break
+						end
+						if node ~= frame and node.ClipsDescendants then
+							local p, s = node.AbsolutePosition, node.AbsoluteSize
+							x0, y0 = math.max(x0, p.X), math.max(y0, p.Y)
+							x1, y1 = math.min(x1, p.X + s.X), math.min(y1, p.Y + s.Y)
+						end
+					end
+					node = node.Parent
+				end
+				local at, extent, offset, rect
+				if shown then
+					at, extent, offset, rect = Library._frostCrop(cp, scale, x0, y0, x1, y1)
+				end
+				if not entry.copy then
+					entry.copy = create("ImageLabel", {
+						Name = "Frost",
+						BackgroundTransparency = 1,
+						Parent = layer,
+					})
+				end
+				local copy = entry.copy
+				copy.Visible = at ~= nil
+				if at then
+					if copy.Image ~= image then
+						copy.Image = image
+					end
+					copy.Position = UDim2.fromOffset(at.X, at.Y)
+					copy.Size = UDim2.fromOffset(extent.X, extent.Y)
+					copy.ImageRectOffset = offset
+					copy.ImageRectSize = rect
+				end
+			end
+		end
+	end
+end
+
+---------------------------------------------------------------------
+-- Logo: an image title whose glow is a separate white layer, tinted at
+-- runtime, so the glow colour can change.
+--
+-- Library:SetLogo({ Image = "rbxasset...", Glow = "rbxasset...", Width = 448, Height = 110 })
+-- Image is the white logo, Glow the white glow; Width/Height give the aspect.
+-- The glow follows Glow.LogoColor (then SurfaceColor, Color, accent) and
+-- Glow.LogoStrength (0..1).
+---------------------------------------------------------------------
+
+function Library:SetLogo(asset)
+	self._logo = asset
+end
+
+-- A Frame holding the logo `height` pixels tall, or nil without SetLogo.
+function Library:CreateLogo(height, parent)
+	local asset = self._logo
+	if not (asset and asset.Image) then
+		return nil
+	end
+	height = height or 24
+	local width = math.floor(height * (asset.Width or 4) / (asset.Height or 1) + 0.5)
+	local holder = create("Frame", {
+		Name = "Logo",
+		Size = UDim2.fromOffset(width, height),
+		BackgroundTransparency = 1,
+		Parent = parent,
+	})
+	local glowImage = asset.Glow or asset.Image
+	local bloom = create("ImageLabel", {
+		Name = "Bloom",
+		AnchorPoint = CENTER,
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1.06, 1.3),
+		BackgroundTransparency = 1,
+		Image = glowImage,
+		ZIndex = 1,
+		Parent = holder,
+	})
+	local glowLabel = create("ImageLabel", {
+		Name = "Glow",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Image = glowImage,
+		ZIndex = 2,
+		Parent = holder,
+	})
+	create("ImageLabel", {
+		Name = "Text",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Image = asset.Image,
+		ZIndex = 3,
+		Parent = holder,
+	})
+	local entry = { kind = "logo", glow = glowLabel, bloom = bloom, holder = holder }
+	table.insert(glows, entry)
+	applyGlow(entry)
+	return holder, entry
 end
 
 -- Library:SetGlass({ Blur = "Off" | "Light" | "Medium" | "Heavy", Transparency = 0..0.95 })
@@ -2759,11 +2976,23 @@ function Library:CreateWindow(config)
 		math.max(size.Y.Offset, 200) - BORDER * 2,
 		pixel
 	)
+	-- Baked-blur crops sit between the petals and the panels (see SetFrost).
+	window._frostLayer = create("Frame", {
+		Name = "Frost",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Visible = false,
+		ZIndex = 2,
+		Parent = content,
+	})
+	if size.X.Scale == 0 and size.Y.Scale == 0 then
+		window._frostSize = Vector2.new(size.X.Offset - BORDER * 2, size.Y.Offset - BORDER * 2)
+	end
 
 	-- Title bar -----------------------------------------------------
 	local titleBar = create("Frame", {
 		Size = UDim2.new(1, 0, 0, TITLE_HEIGHT),
-		ZIndex = 3,
+		ZIndex = 4,
 		Theme = { BackgroundColor3 = "Header" },
 		Parent = content,
 	})
@@ -2772,14 +3001,24 @@ function Library:CreateWindow(config)
 	icon.AnchorPoint = Vector2.new(0, 0.5)
 	icon.Position = UDim2.new(0, 7, 0.5, 0)
 	icon.Parent = titleBar
-	local title = label({
-		Position = UDim2.fromOffset(38, 0),
-		Size = UDim2.new(0, 0, 1, 0),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Text = config.Title or "sakura ui",
-		Parent = titleBar,
-	})
-	addGlow(title, "text")
+	if type(config.Logo) == "table" then
+		self:SetLogo(config.Logo)
+	end
+	local logo = config.Logo and self:CreateLogo(config.LogoHeight or 34, titleBar)
+	if logo then
+		logo.AnchorPoint = Vector2.new(0, 0.5)
+		logo.Position = UDim2.new(0, 30, 0.5, 0)
+		window._logo = logo
+	else
+		local title = label({
+			Position = UDim2.fromOffset(38, 0),
+			Size = UDim2.new(0, 0, 1, 0),
+			AutomaticSize = Enum.AutomaticSize.X,
+			Text = config.Title or "sakura ui",
+			Parent = titleBar,
+		})
+		addGlow(title, "text")
+	end
 	if config.SubTitle then
 		label({
 			AnchorPoint = Vector2.new(1, 0),
@@ -2836,7 +3075,7 @@ function Library:CreateWindow(config)
 	local tabBar = create("Frame", {
 		Position = UDim2.fromOffset(0, TITLE_HEIGHT),
 		Size = UDim2.new(1, 0, 0, TAB_HEIGHT),
-		ZIndex = 3,
+		ZIndex = 4,
 		Theme = { BackgroundColor3 = "Header" },
 		Parent = content,
 	})
@@ -2862,7 +3101,7 @@ function Library:CreateWindow(config)
 	local subBar = create("Frame", {
 		Position = UDim2.fromOffset(0, TITLE_HEIGHT + TAB_HEIGHT),
 		Size = UDim2.new(1, 0, 0, SUB_HEIGHT),
-		ZIndex = 3,
+		ZIndex = 4,
 		Theme = { BackgroundColor3 = "Panel" },
 		Parent = content,
 	})
@@ -2886,7 +3125,7 @@ function Library:CreateWindow(config)
 		Position = UDim2.fromOffset(0, top),
 		Size = UDim2.new(1, 0, 1, -top - STATUS_HEIGHT),
 		BackgroundTransparency = 1,
-		ZIndex = 2,
+		ZIndex = 3,
 		Parent = content,
 	})
 
@@ -2895,7 +3134,7 @@ function Library:CreateWindow(config)
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0, 1),
 		Size = UDim2.new(1, 0, 0, STATUS_HEIGHT),
-		ZIndex = 3,
+		ZIndex = 4,
 		Theme = { BackgroundColor3 = "Header" },
 		Parent = content,
 	})
@@ -2959,12 +3198,24 @@ function Library:CreateWindow(config)
 	-- Glow pulse: breathe the window glow's opacity.
 	local clock = 0
 	connect(RunService.Heartbeat, function(dt)
+		if not window.Visible then
+			return
+		end
+		soft("frost", updateFrost, window)
 		local settings = Library.Glow
-		if not (window._glow and window.Visible and settings.Enabled and settings.Pulse) then
+		if not settings.Pulse then
 			return
 		end
 		clock = clock + dt
-		applyGlow(window._glow, 0.8 + 0.2 * math.sin(clock * 2.4))
+		local pulse = 0.8 + 0.2 * math.sin(clock * 2.4)
+		if window._glow and settings.Enabled then
+			applyGlow(window._glow, pulse)
+		end
+		for _, entry in ipairs(glows) do
+			if entry.kind == "logo" then
+				applyGlow(entry, pulse)
+			end
+		end
 	end)
 
 	table.insert(self._windows, window)
@@ -3147,7 +3398,7 @@ function Window:AddSidePanel(config)
 		Name = "SidePanel",
 		Position = UDim2.new(1, -width, 0, top),
 		Size = UDim2.new(0, width, 1, -top - STATUS_HEIGHT),
-		ZIndex = 2,
+		ZIndex = 3,
 		Theme = { BackgroundColor3 = "Panel" },
 		Parent = self._content,
 	}, {

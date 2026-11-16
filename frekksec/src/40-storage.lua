@@ -159,9 +159,10 @@ local function makeFrekksecStorage(schema, d)
     function S:ValidateTheme(colors)
         if type(colors) ~= "table" then error("Invalid theme colors.", 0) end
         local clean = {}
-        for _, key in ipairs({"MainColor","AccentColor","BackgroundColor","OutlineColor","FontColor","SurfaceGlowColor","ControlGlowColor"}) do
+        for _, key in ipairs({"MainColor","AccentColor","BackgroundColor","OutlineColor","FontColor","SurfaceGlowColor","ControlGlowColor","LogoGlowColor"}) do
             local rgb = colors[key]
             if rgb == nil and (key == "SurfaceGlowColor" or key == "ControlGlowColor") then rgb = colors.AccentColor end
+            if rgb == nil and key == "LogoGlowColor" then rgb = {180, 124, 255} end
             if type(rgb) ~= "table" or #rgb ~= 3 then error("Theme is missing " .. key, 0) end
             clean[key] = {}
             for i=1,3 do
