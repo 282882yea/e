@@ -119,3 +119,7 @@ Window:SelectTab(Tab)
 Nova.OnUnload = function() end -- clean up your own loops here
 Nova:Unload()
 ```
+
+## Sakura UI
+
+A wide, Linoria-style variant with tabs and sub-tabs along the top, a pixel font, pixel flowers, a pixel-art Tokyo backdrop, an adjustable `UIShadow` glow and `UIBlur` frosted panels. See [SAKURA.md](SAKURA.md).
