@@ -516,6 +516,7 @@ local function loadFrekksecUI(private)
         local window = Sakura:CreateWindow({
             Title = title,
             Logo = assets.Logo,
+            LogoHeight = 22,
             Size = UDim2.fromOffset(1010, 590),
             ToggleKey = Enum.KeyCode.Insert,
             Footer = "frekksec lua  |  F6 helper  |  X fake position  |  End panic",

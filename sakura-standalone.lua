@@ -2947,6 +2947,8 @@ function Library:CreateWindow(config)
 
 	-- Scale: whatever SetScale asks for, shrunk so the window fits the screen.
 	window._userScale = 1
+	window._zoom = 1 -- from corner resizing
+	window._baseSize = size
 	window._scales = {}
 	for _, frame in ipairs(window._roots) do
 		table.insert(window._scales, create("UIScale", { Scale = 1, Parent = frame }))
@@ -2959,7 +2961,7 @@ function Library:CreateWindow(config)
 			local viewport = camera.ViewportSize
 			fit = math.min((viewport.X - 24) / current.X.Offset, (viewport.Y - 24) / current.Y.Offset)
 		end
-		local value = math.clamp(math.min(self._userScale, fit), 0.4, 2)
+		local value = math.clamp(math.min(self._userScale * self._zoom, fit), 0.4, 3)
 		for _, scale in ipairs(self._scales) do
 			scale.Scale = value
 		end
@@ -3119,14 +3121,13 @@ function Library:CreateWindow(config)
 				return
 			end
 			local origin = input.Position
-			local startSize = window._size
-			local scale = window._scales[1] and window._scales[1].Scale or 1
+			local startW, startH = window:GetWindowSize()
 			trackDrag(input, function(position)
 				local delta = position - origin
-				window:SetSize(startSize.X.Offset + delta.X / scale, startSize.Y.Offset + delta.Y / scale)
+				window:SetWindowSize(startW + delta.X, startH + delta.Y)
 			end, function()
 				if window.OnResized then
-					task.spawn(window.OnResized, window._size.X.Offset, window._size.Y.Offset)
+					task.spawn(window.OnResized, window:GetWindowSize())
 				end
 			end)
 		end)
@@ -3347,6 +3348,46 @@ function Window:SetSize(width, height)
 	if self._petals and self._petals.SetBounds then
 		self._petals:SetBounds(width - BORDER * 2, height - BORDER * 2)
 	end
+end
+
+-- Resizes by on-screen pixels. Everything scales with the width (buttons, text,
+-- groupboxes), and extra height becomes extra room; the top-left corner stays put.
+function Window:SetWindowSize(width, height)
+	local base = self._baseSize
+	local min = self.MinSize or Vector2.new(640, 400)
+	local camera = workspace and workspace.CurrentCamera
+	local oldScale = self._scales[1] and self._scales[1].Scale or 1
+	local oldW = self._size.X.Offset * oldScale
+	local oldH = self._size.Y.Offset * oldScale
+	width, height = tonumber(width) or oldW, tonumber(height) or oldH
+	if camera then
+		width = math.min(width, camera.ViewportSize.X - 8)
+		height = math.min(height, camera.ViewportSize.Y - 8)
+	end
+	local zoom = math.clamp(width / base.X.Offset / self._userScale, 0.5, 3)
+	self._zoom = zoom
+	self:_rescale()
+	local scale = self._scales[1] and self._scales[1].Scale or 1
+	local logicalW = math.max(min.X, math.floor(width / scale + 0.5))
+	local logicalH = math.max(min.Y, math.floor(height / scale + 0.5))
+	self._size = UDim2.fromOffset(logicalW, logicalH)
+	local dw, dh = logicalW * scale - oldW, logicalH * scale - oldH
+	for _, frame in ipairs(self._roots) do
+		local pos = frame.Position
+		frame.Position = UDim2.new(pos.X.Scale, pos.X.Offset + dw / 2, pos.Y.Scale, pos.Y.Offset + dh / 2)
+		if not self.Minimized then
+			frame.Size = self._size
+		end
+	end
+	self._frostSize = Vector2.new(logicalW - BORDER * 2, logicalH - BORDER * 2)
+	if self._petals and self._petals.SetBounds then
+		self._petals:SetBounds(logicalW - BORDER * 2, logicalH - BORDER * 2)
+	end
+end
+
+function Window:GetWindowSize()
+	local scale = self._scales[1] and self._scales[1].Scale or 1
+	return self._size.X.Offset * scale, self._size.Y.Offset * scale
 end
 
 function Window:GetSize()

@@ -221,12 +221,12 @@ local function makeFrekksecSettings(helper, ui, private, window, store, d)
     control(sakura,"LogoGlow","Logo glow (%)")
     -- Window size: drag the bottom-right corner; it is remembered.
     if ui.Window then
-        ui.Window:SetSize(P.WindowWidth,P.WindowHeight)
+        ui.Window:SetWindowSize(P.WindowWidth,P.WindowHeight)
         ui.Window.OnResized=function(w,h) P.WindowWidth,P.WindowHeight=w,h;persist() end
     end
     sakura:AddButton("Reset window size",function()
         P.WindowWidth,P.WindowHeight=1010,590
-        if ui.Window then ui.Window:SetSize(1010,590) end
+        if ui.Window then ui.Window:SetWindowSize(1010,590) end
         persist()
     end)
 
