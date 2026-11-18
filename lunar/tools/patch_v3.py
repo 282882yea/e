@@ -7,6 +7,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import build_frekks as bf  # noqa: E402
 import fixes_v3b  # noqa: E402
+import fixes_wire  # noqa: E402
 import base64
 SNOWBALL = base64.b64encode(open(os.path.join(HERE, '..', 'frekks', 'snowball.png'), 'rb').read()).decode()
 
@@ -402,6 +403,7 @@ def main():
     original = open(sys.argv[1], encoding="utf-8").read()
     text = visuals(original)  # the file's own UI module (with its edits) is kept as-is
     text = fixes_v3b.apply(text)
+    text = fixes_wire.apply(text)
     open(sys.argv[2], "w", encoding="utf-8").write(text)
     print("in", len(original), "out", len(text))
 
